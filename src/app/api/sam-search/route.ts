@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SAMOpportunity, SAMSearchFilters, SAMSearchResponse, EmbeddingRequest, EmbeddingResponse } from '@/types';
 import { cosineSimilarity } from '@/lib/utils';
+import { vectorStoreUtils } from '@/lib/vectorStore';
+import { withCache, generateCacheKey } from '@/lib/redis';
 
 // SAM.gov API configuration
 const SAM_BASE_URL = process.env.SAM_BASE_URL || 'https://api.sam.gov';
@@ -135,135 +137,161 @@ async function searchSAMOpportunities(
   filters: SAMSearchFilters,
   samApiKey: string
 ): Promise<SAMOpportunity[]> {
-  const params = new URLSearchParams();
+  // Generate cache key based on filters
+  const cacheKey = generateCacheKey(JSON.stringify(filters), 'sam-search');
   
-  // Add search parameters
-  if (filters.keyword) {
-    params.append('q', filters.keyword);
-  }
-  
-  if (filters.startDate) {
-    params.append('postedFrom', filters.startDate);
-  }
-  
-  if (filters.endDate) {
-    params.append('postedTo', filters.endDate);
-  }
-  
-  if (filters.naicsCode) {
-    params.append('naicsCode', filters.naicsCode);
-  }
-  
-  if (filters.state) {
-    params.append('state', filters.state);
-  }
-  
-  if (filters.agency) {
-    params.append('agency', filters.agency);
-  }
-  
-  if (filters.type) {
-    params.append('noticeType', filters.type);
-  }
-  
-  if (filters.setAside) {
-    params.append('setAside', filters.setAside);
-  }
-  
-  if (filters.active !== undefined) {
-    params.append('active', filters.active.toString());
-  }
-  
-  // Enhanced search parameters
-  if (filters.entityName) {
-    params.append('entityName', filters.entityName);
-  }
-  
-  if (filters.contractVehicle) {
-    params.append('contractVehicle', filters.contractVehicle);
-  }
-  
-  if (filters.classificationCode) {
-    params.append('classificationCode', filters.classificationCode);
-  }
-  
-  if (filters.fundingSource) {
-    params.append('fundingSource', filters.fundingSource);
-  }
-  
-  if (filters.responseDeadline?.from) {
-    params.append('responseDeadlineFrom', filters.responseDeadline.from);
-  }
-  
-  if (filters.responseDeadline?.to) {
-    params.append('responseDeadlineTo', filters.responseDeadline.to);
-  }
-  
-  if (filters.estimatedValue?.min) {
-    params.append('estimatedValueMin', filters.estimatedValue.min.toString());
-  }
-  
-  if (filters.estimatedValue?.max) {
-    params.append('estimatedValueMax', filters.estimatedValue.max.toString());
-  }
-  
-  if (filters.hasAttachments) {
-    params.append('hasAttachments', 'true');
-  }
-  
-  params.append('limit', Math.min(filters.limit || 50, 100).toString());
-  params.append('offset', (filters.offset || 0).toString());
-  
-  // Add default parameters
-  params.append('includeCount', 'true');
-  params.append('format', 'json');
-  
-  const url = `${SAM_BASE_URL}${SAM_OPPORTUNITIES_ENDPOINT}?${params.toString()}`;
-  
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'X-API-Key': samApiKey,
-      'Accept': 'application/json',
-    },
-  });
-  
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`SAM.gov API error: ${response.status} ${response.statusText} - ${error}`);
-  }
-  
-  const data = await response.json();
-  
-  // Transform SAM.gov response to our format
-  return data.opportunitiesData?.map((opportunity: any) => ({
-    id: opportunity.noticeId || opportunity.solicitationNumber,
-    noticeId: opportunity.noticeId,
-    title: opportunity.title,
-    description: opportunity.description || '',
-    synopsis: opportunity.synopsis || '',
-    type: opportunity.type,
-    baseType: opportunity.baseType,
-    archiveType: opportunity.archiveType,
-    archiveDate: opportunity.archiveDate,
-    typeOfSetAsideDescription: opportunity.typeOfSetAsideDescription,
-    typeOfSetAside: opportunity.typeOfSetAside,
-    responseDeadLine: opportunity.responseDeadLine,
-    naicsCode: opportunity.naicsCode,
-    naicsDescription: opportunity.naicsDescription,
-    classificationCode: opportunity.classificationCode,
-    active: opportunity.active,
-    award: opportunity.award,
-    pointOfContact: opportunity.pointOfContact,
-    placeOfPerformance: opportunity.placeOfPerformance,
-    organizationType: opportunity.organizationType,
-    officeAddress: opportunity.officeAddress,
-    links: opportunity.links,
-    uiLink: opportunity.uiLink,
-    relevanceScore: 0, // Will be calculated if semantic search is used
-    isFavorite: false,
-    tags: [],
-  })) || [];
+  // Use cache wrapper
+  return withCache(cacheKey, async () => {
+    const params = new URLSearchParams();
+    
+    // Add search parameters
+    if (filters.keyword) {
+      params.append('q', filters.keyword);
+    }
+    
+    if (filters.startDate) {
+      params.append('postedFrom', filters.startDate);
+    }
+    
+    if (filters.endDate) {
+      params.append('postedTo', filters.endDate);
+    }
+    
+    if (filters.naicsCode) {
+      params.append('naicsCode', filters.naicsCode);
+    }
+    
+    if (filters.state) {
+      params.append('state', filters.state);
+    }
+    
+    if (filters.agency) {
+      params.append('agency', filters.agency);
+    }
+    
+    if (filters.type) {
+      params.append('noticeType', filters.type);
+    }
+    
+    if (filters.setAside) {
+      params.append('setAside', filters.setAside);
+    }
+    
+    if (filters.active !== undefined) {
+      params.append('active', filters.active.toString());
+    }
+    
+    // Enhanced search parameters
+    if (filters.entityName) {
+      params.append('entityName', filters.entityName);
+    }
+    
+    if (filters.contractVehicle) {
+      params.append('contractVehicle', filters.contractVehicle);
+    }
+    
+    if (filters.classificationCode) {
+      params.append('classificationCode', filters.classificationCode);
+    }
+    
+    if (filters.fundingSource) {
+      params.append('fundingSource', filters.fundingSource);
+    }
+    
+    if (filters.responseDeadline?.from) {
+      params.append('responseDeadlineFrom', filters.responseDeadline.from);
+    }
+    
+    if (filters.responseDeadline?.to) {
+      params.append('responseDeadlineTo', filters.responseDeadline.to);
+    }
+    
+    if (filters.estimatedValue?.min) {
+      params.append('estimatedValueMin', filters.estimatedValue.min.toString());
+    }
+    
+    if (filters.estimatedValue?.max) {
+      params.append('estimatedValueMax', filters.estimatedValue.max.toString());
+    }
+    
+    if (filters.hasAttachments) {
+      params.append('hasAttachments', 'true');
+    }
+    
+    params.append('limit', Math.min(filters.limit || 50, 100).toString());
+    params.append('offset', (filters.offset || 0).toString());
+    
+    // Add default parameters
+    params.append('includeCount', 'true');
+    params.append('format', 'json');
+    
+    const url = `${SAM_BASE_URL}${SAM_OPPORTUNITIES_ENDPOINT}?${params.toString()}`;
+    
+    // Log the request for debugging (remove sensitive data)
+    console.log('SAM.gov API request:', {
+      url: `${SAM_BASE_URL}${SAM_OPPORTUNITIES_ENDPOINT}`,
+      params: Object.fromEntries(params.entries()),
+      hasApiKey: !!samApiKey
+    });
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'X-API-Key': samApiKey,
+        'Accept': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      const error = await response.text();
+      let errorMessage = `SAM.gov API error: ${response.status} ${response.statusText}`;
+      
+      try {
+        const errorJson = JSON.parse(error);
+        if (errorJson.errorMessage) {
+          errorMessage += ` - ${errorJson.errorMessage}`;
+        } else {
+          errorMessage += ` - ${error}`;
+        }
+      } catch {
+        errorMessage += ` - ${error}`;
+      }
+      
+      throw new Error(errorMessage);
+    }
+    
+    const data = await response.json();
+    
+    // Transform SAM.gov response to our format
+    return data.opportunitiesData?.map((opportunity: any) => ({
+      id: opportunity.noticeId || opportunity.solicitationNumber,
+      noticeId: opportunity.noticeId,
+      title: opportunity.title,
+      description: opportunity.description || '',
+      synopsis: opportunity.synopsis || '',
+      type: opportunity.type,
+      baseType: opportunity.baseType,
+      archiveType: opportunity.archiveType,
+      archiveDate: opportunity.archiveDate,
+      typeOfSetAsideDescription: opportunity.typeOfSetAsideDescription,
+      typeOfSetAside: opportunity.typeOfSetAside,
+      responseDeadLine: opportunity.responseDeadLine,
+      naicsCode: opportunity.naicsCode,
+      naicsDescription: opportunity.naicsDescription,
+      classificationCode: opportunity.classificationCode,
+      active: opportunity.active,
+      award: opportunity.award,
+      pointOfContact: opportunity.pointOfContact,
+      placeOfPerformance: opportunity.placeOfPerformance,
+      organizationType: opportunity.organizationType,
+      officeAddress: opportunity.officeAddress,
+      links: opportunity.links,
+      uiLink: opportunity.uiLink,
+      relevanceScore: 0, // Will be calculated if semantic search is used
+      isFavorite: false,
+      tags: [],
+    })) || [];
+  }, { prefix: 'sam-search', ttl: 1800 }); // Cache for 30 minutes
 }
 
 /**
@@ -354,11 +382,51 @@ export async function GET(req: NextRequest) {
       }, { status: 400 });
     }
     
+    // Set default date range if not provided (last 30 days)
+    const today = new Date();
+    const thirtyDaysAgo = new Date(today);
+    thirtyDaysAgo.setDate(today.getDate() - 30);
+    
+    // Format dates as MM/dd/yyyy for SAM.gov API
+    const formatDateForSAM = (date: Date) => {
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${month}/${day}/${year}`;
+    };
+    
+    // Convert date string to MM/dd/yyyy format if needed
+    const normalizeDate = (dateStr: string | null | undefined): string | undefined => {
+      if (!dateStr) return undefined;
+      
+      // If already in MM/dd/yyyy format, return as is
+      if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateStr)) {
+        return dateStr;
+      }
+      
+      // If in YYYY-MM-DD format, convert to MM/dd/yyyy
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        const [year, month, day] = dateStr.split('-');
+        return `${month}/${day}/${year}`;
+      }
+      
+      // Try to parse as Date and format
+      const date = new Date(dateStr);
+      if (!isNaN(date.getTime())) {
+        return formatDateForSAM(date);
+      }
+      
+      return undefined;
+    };
+    
+    const defaultStartDate = formatDateForSAM(thirtyDaysAgo);
+    const defaultEndDate = formatDateForSAM(today);
+    
     // Build search filters
     const filters: SAMSearchFilters = {
       keyword: keyword || undefined,
-      startDate: startDate || undefined,
-      endDate: endDate || undefined,
+      startDate: normalizeDate(startDate) || defaultStartDate,
+      endDate: normalizeDate(endDate) || defaultEndDate,
       naicsCode: naicsCode || undefined,
       state: state || undefined,
       agency: agency || undefined,
@@ -373,8 +441,8 @@ export async function GET(req: NextRequest) {
       classificationCode: classificationCode || undefined,
       fundingSource: fundingSource || undefined,
       responseDeadline: {
-        from: responseDeadlineFrom || undefined,
-        to: responseDeadlineTo || undefined,
+        from: normalizeDate(responseDeadlineFrom) || undefined,
+        to: normalizeDate(responseDeadlineTo) || undefined,
       },
       estimatedValue: {
         min: estimatedValueMin ? parseFloat(estimatedValueMin) : undefined,
@@ -402,6 +470,17 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'SAM API key is required' }, { status: 400 });
     }
     const opportunities = await searchSAMOpportunities(filters, samApiKey);
+    
+    // Add opportunities to vector store for future semantic search
+    if (opportunities.length > 0) {
+      try {
+        await Promise.all(
+          opportunities.slice(0, 10).map(opp => vectorStoreUtils.addOpportunity(opp))
+        );
+      } catch (error) {
+        console.warn('Failed to add opportunities to vector store:', error);
+      }
+    }
     
     // Perform semantic search if requested and query is provided
     let finalOpportunities = opportunities;

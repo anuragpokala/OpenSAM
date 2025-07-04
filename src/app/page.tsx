@@ -27,15 +27,18 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
-import { useAppStore, useUIState, useLLMConfig } from '@/stores/appStore';
-import { cn } from '@/lib/utils';
+import { useAppStore, useUIState, useLLMConfig, useCompanyProfile, useIsCompanyProfileLoading } from '@/stores/appStore';
+import { cn, generateId } from '@/lib/utils';
+import SearchView from '@/components/SearchView';
+import CacheStatus from '@/components/CacheStatus';
+import { CompanyProfile } from '@/types';
 
 // Navigation items
 const navigationItems = [
   { id: 'chat', label: 'Chat', icon: MessageCircle },
   { id: 'search', label: 'Search', icon: Search },
   { id: 'forecast', label: 'Forecast', icon: TrendingUp },
-  { id: 'upload', label: 'Upload', icon: Upload },
+  { id: 'upload', label: 'AI Company Profile', icon: Upload },
 ];
 
 // Main Dashboard Component
@@ -289,6 +292,97 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* Settings Panel */}
+      {showSettings && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-opensam-white rounded-lg p-6 w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold">Settings</h3>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowSettings(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* LLM Configuration */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>LLM Configuration</CardTitle>
+                  <CardDescription>
+                    Configure your AI provider settings
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-opensam-gray-700 mb-1">
+                      Provider
+                    </label>
+                    <Select value={llmConfig.provider} onValueChange={(value) => setLLMProvider(value as any)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="openai">OpenAI</SelectItem>
+                        <SelectItem value="anthropic">Anthropic</SelectItem>
+                        <SelectItem value="huggingface">Hugging Face</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-opensam-gray-700 mb-1">
+                      Model
+                    </label>
+                    <Select value={llmConfig.model} onValueChange={(value) => setLLMModel(value as any)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {llmConfig.provider === 'openai' && (
+                          <>
+                            <SelectItem value="gpt-4">GPT-4</SelectItem>
+                            <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
+                          </>
+                        )}
+                        {llmConfig.provider === 'anthropic' && (
+                          <>
+                            <SelectItem value="claude-3-opus">Claude 3 Opus</SelectItem>
+                            <SelectItem value="claude-3-sonnet">Claude 3 Sonnet</SelectItem>
+                            <SelectItem value="claude-3-haiku">Claude 3 Haiku</SelectItem>
+                          </>
+                        )}
+                        {llmConfig.provider === 'huggingface' && (
+                          <>
+                            <SelectItem value="meta-llama/Llama-2-70b-chat-hf">Llama 2 70B</SelectItem>
+                            <SelectItem value="microsoft/DialoGPT-medium">DialoGPT Medium</SelectItem>
+                          </>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => setApiKeyDialogOpen(true)}
+                  >
+                    <Key className="h-4 w-4 mr-2" />
+                    {llmConfig.apiKey ? 'Update API Key' : 'Set API Key'}
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Cache Status */}
+              <CacheStatus />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -436,63 +530,6 @@ function ChatView() {
   );
 }
 
-// Search View Component
-function SearchView() {
-  return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <Search className="h-5 w-5 mr-2" />
-            Semantic Search
-          </CardTitle>
-          <CardDescription>
-            Search SAM.gov opportunities using natural language queries.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="flex space-x-2">
-              <Input
-                placeholder="Search for opportunities... (e.g., 'AI software development contracts')"
-                className="flex-1"
-              />
-              <Button>
-                <Search className="h-4 w-4 mr-2" />
-                Search
-              </Button>
-            </div>
-            <div className="flex space-x-2">
-              <Button variant="outline" size="sm">
-                <Filter className="h-4 w-4 mr-2" />
-                Filters
-              </Button>
-              <Button variant="outline" size="sm">
-                <Star className="h-4 w-4 mr-2" />
-                Favorites
-              </Button>
-              <Button variant="outline" size="sm">
-                <Download className="h-4 w-4 mr-2" />
-                Export
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      
-      <Card>
-        <CardContent className="p-6">
-          <div className="text-center text-opensam-gray-500 py-12">
-            <Search className="h-12 w-12 mx-auto mb-4 text-opensam-gray-400" />
-            <p className="text-lg">No search results yet</p>
-            <p className="text-sm mt-1">Enter a search query to find relevant opportunities</p>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
 // Forecast View Component
 function ForecastView() {
   return (
@@ -550,41 +587,466 @@ function ForecastView() {
   );
 }
 
-// Upload View Component
+// AI Company Profile View Component
 function UploadView() {
+  const [ueiSAM, setUeiSAM] = useState('');
+  const [description, setDescription] = useState('');
+  const [businessTypes, setBusinessTypes] = useState<string[]>([]);
+  const [naicsCodes, setNaicsCodes] = useState<string[]>([]);
+  const [capabilities, setCapabilities] = useState<string[]>([]);
+  const [pastPerformance, setPastPerformance] = useState<string[]>([]);
+  const [certifications, setCertifications] = useState<string[]>([]);
+  const [contactInfo, setContactInfo] = useState({
+    address: '',
+    city: '',
+    state: '',
+    zipCode: '',
+    phone: '',
+    email: '',
+    website: ''
+  });
+  
+  const companyProfile = useCompanyProfile();
+  const isCompanyProfileLoading = useIsCompanyProfileLoading();
+  const { 
+    setCompanyProfile, 
+    updateCompanyProfile, 
+    setIsCompanyProfileLoading, 
+    fetchSAMEntityData, 
+    saveCompanyProfile 
+  } = useAppStore();
+
+  // Load existing profile on mount
+  useEffect(() => {
+    if (companyProfile) {
+      setUeiSAM(companyProfile.ueiSAM);
+      setDescription(companyProfile.description);
+      setBusinessTypes(companyProfile.businessTypes);
+      setNaicsCodes(companyProfile.naicsCodes);
+      setCapabilities(companyProfile.capabilities);
+      setPastPerformance(companyProfile.pastPerformance);
+      setCertifications(companyProfile.certifications);
+      setContactInfo(companyProfile.contactInfo);
+    }
+  }, [companyProfile]);
+
+  const handleFetchSAMData = async () => {
+    if (!ueiSAM.trim()) {
+      alert('Please enter a UEI SAM number');
+      return;
+    }
+
+    setIsCompanyProfileLoading(true);
+    try {
+      const samData = await fetchSAMEntityData(ueiSAM);
+      if (samData) {
+        // Update form with SAM data
+        setContactInfo({
+          address: samData.address?.line1 || '',
+          city: samData.address?.city || '',
+          state: samData.address?.state || '',
+          zipCode: samData.address?.zipCode || '',
+          phone: samData.pointOfContact?.phone || '',
+          email: samData.pointOfContact?.email || '',
+          website: contactInfo.website || ''
+        });
+        setBusinessTypes(samData.businessTypes || []);
+        
+        // Update company profile with SAM data
+        const updatedProfile: CompanyProfile = {
+          id: companyProfile?.id || generateId(),
+          ueiSAM,
+          entityName: samData.entityName,
+          description: description || `Company profile for ${samData.entityName}`,
+          businessTypes: samData.businessTypes || [],
+          naicsCodes: naicsCodes,
+          capabilities: capabilities,
+          pastPerformance: pastPerformance,
+          certifications: certifications,
+          contactInfo: {
+            address: samData.address?.line1 || '',
+            city: samData.address?.city || '',
+            state: samData.address?.state || '',
+            zipCode: samData.address?.zipCode || '',
+            phone: samData.pointOfContact?.phone || '',
+            email: samData.pointOfContact?.email || '',
+            website: contactInfo.website || ''
+          },
+          samEntityData: samData,
+          createdAt: companyProfile?.createdAt || Date.now(),
+          updatedAt: Date.now()
+        };
+        
+        await saveCompanyProfile(updatedProfile);
+        alert('SAM.gov entity data fetched and saved successfully!');
+      } else {
+        alert('No entity found with the provided UEI SAM number');
+      }
+    } catch (error) {
+      console.error('Error fetching SAM data:', error);
+      alert('Failed to fetch SAM.gov entity data. Please check your API key and try again.');
+    } finally {
+      setIsCompanyProfileLoading(false);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    if (!ueiSAM.trim()) {
+      alert('Please enter a UEI SAM number');
+      return;
+    }
+
+    if (!description.trim()) {
+      alert('Please provide a company description');
+      return;
+    }
+
+    try {
+      const profile: CompanyProfile = {
+        id: companyProfile?.id || generateId(),
+        ueiSAM,
+        entityName: companyProfile?.entityName || 'Your Company',
+        description,
+        businessTypes,
+        naicsCodes,
+        capabilities,
+        pastPerformance,
+        certifications,
+        contactInfo,
+        samEntityData: companyProfile?.samEntityData,
+        createdAt: companyProfile?.createdAt || Date.now(),
+        updatedAt: Date.now()
+      };
+
+      await saveCompanyProfile(profile);
+      alert('Company profile saved successfully!');
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      alert('Failed to save company profile');
+    }
+  };
+
+  const addArrayItem = (array: string[], setter: (items: string[]) => void, placeholder: string) => {
+    const item = prompt(`Enter ${placeholder}:`);
+    if (item && item.trim()) {
+      setter([...array, item.trim()]);
+    }
+  };
+
+  const removeArrayItem = (array: string[], setter: (items: string[]) => void, index: number) => {
+    setter(array.filter((_, i) => i !== index));
+  };
+
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center">
             <Upload className="h-5 w-5 mr-2" />
-            Document Upload
+            AI Company Profile
           </CardTitle>
           <CardDescription>
-            Upload past performance documents, proposals, and other files for AI analysis.
+            Create and manage your company profile for AI-powered opportunity matching and analysis.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            <div className="border-2 border-dashed border-opensam-gray-300 rounded-lg p-12 text-center">
-              <Upload className="h-12 w-12 mx-auto mb-4 text-opensam-gray-400" />
-              <h3 className="text-lg font-medium text-opensam-black mb-2">
-                Drop files here or click to browse
-              </h3>
-              <p className="text-opensam-gray-600 mb-4">
-                Supports PDF, CSV, and text files up to 10MB
-              </p>
-              <Button>
-                Choose Files
-              </Button>
-            </div>
-            
-            <div className="space-y-2">
-              <h4 className="font-medium text-opensam-black">Recent Uploads</h4>
-              <div className="text-opensam-gray-500 text-sm">
-                No files uploaded yet
+          <div className="space-y-6">
+            {/* UEI SAM Section */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium text-opensam-black">Company Identification</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-opensam-gray-700">UEI SAM Number *</label>
+                  <div className="flex space-x-2 mt-1">
+                    <Input
+                      placeholder="Enter your UEI SAM number"
+                      value={ueiSAM}
+                      onChange={(e) => setUeiSAM(e.target.value)}
+                    />
+                    <Button 
+                      onClick={handleFetchSAMData}
+                      disabled={isCompanyProfileLoading || !ueiSAM.trim()}
+                      variant="outline"
+                    >
+                      {isCompanyProfileLoading ? 'Fetching...' : 'Fetch SAM Data'}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-opensam-gray-500 mt-1">
+                    Enter your UEI SAM number to automatically fetch company data from SAM.gov
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-opensam-gray-700">Company Name</label>
+                  <Input
+                    placeholder="Company name"
+                    value={companyProfile?.entityName || ''}
+                    disabled
+                    className="mt-1"
+                  />
+                </div>
               </div>
             </div>
+
+            {/* Company Description */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium text-opensam-black">Company Description</h3>
+              <div>
+                <label className="text-sm font-medium text-opensam-gray-700">Description *</label>
+                <textarea
+                  className="w-full mt-1 p-3 border border-opensam-gray-300 rounded-lg resize-none"
+                  rows={4}
+                  placeholder="Describe what your company does, your expertise, and key capabilities..."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Business Information */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium text-opensam-black">Business Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Business Types */}
+                <div>
+                  <label className="text-sm font-medium text-opensam-gray-700">Business Types</label>
+                  <div className="mt-1 space-y-2">
+                    {businessTypes.map((type, index) => (
+                      <div key={index} className="flex items-center space-x-2">
+                        <span className="text-sm bg-opensam-gray-100 px-2 py-1 rounded">{type}</span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => removeArrayItem(businessTypes, setBusinessTypes, index)}
+                        >
+                          ×
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => addArrayItem(businessTypes, setBusinessTypes, 'business type')}
+                    >
+                      + Add Business Type
+                    </Button>
+                  </div>
+                </div>
+
+                {/* NAICS Codes */}
+                <div>
+                  <label className="text-sm font-medium text-opensam-gray-700">NAICS Codes</label>
+                  <div className="mt-1 space-y-2">
+                    {naicsCodes.map((code, index) => (
+                      <div key={index} className="flex items-center space-x-2">
+                        <span className="text-sm bg-opensam-gray-100 px-2 py-1 rounded">{code}</span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => removeArrayItem(naicsCodes, setNaicsCodes, index)}
+                        >
+                          ×
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => addArrayItem(naicsCodes, setNaicsCodes, 'NAICS code')}
+                    >
+                      + Add NAICS Code
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Capabilities */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium text-opensam-black">Capabilities & Expertise</h3>
+              <div>
+                <label className="text-sm font-medium text-opensam-gray-700">Key Capabilities</label>
+                <div className="mt-1 space-y-2">
+                  {capabilities.map((capability, index) => (
+                    <div key={index} className="flex items-center space-x-2">
+                      <span className="text-sm bg-blue-100 px-2 py-1 rounded">{capability}</span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => removeArrayItem(capabilities, setCapabilities, index)}
+                      >
+                        ×
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => addArrayItem(capabilities, setCapabilities, 'capability')}
+                  >
+                    + Add Capability
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Past Performance */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium text-opensam-black">Past Performance</h3>
+              <div>
+                <label className="text-sm font-medium text-opensam-gray-700">Past Performance Projects</label>
+                <div className="mt-1 space-y-2">
+                  {pastPerformance.map((project, index) => (
+                    <div key={index} className="flex items-center space-x-2">
+                      <span className="text-sm bg-green-100 px-2 py-1 rounded">{project}</span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => removeArrayItem(pastPerformance, setPastPerformance, index)}
+                      >
+                        ×
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => addArrayItem(pastPerformance, setPastPerformance, 'past performance project')}
+                  >
+                    + Add Past Performance
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Certifications */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium text-opensam-black">Certifications</h3>
+              <div>
+                <label className="text-sm font-medium text-opensam-gray-700">Certifications & Qualifications</label>
+                <div className="mt-1 space-y-2">
+                  {certifications.map((cert, index) => (
+                    <div key={index} className="flex items-center space-x-2">
+                      <span className="text-sm bg-purple-100 px-2 py-1 rounded">{cert}</span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => removeArrayItem(certifications, setCertifications, index)}
+                      >
+                        ×
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => addArrayItem(certifications, setCertifications, 'certification')}
+                  >
+                    + Add Certification
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Contact Information */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium text-opensam-black">Contact Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-opensam-gray-700">Address</label>
+                  <Input
+                    placeholder="Street address"
+                    value={contactInfo.address}
+                    onChange={(e) => setContactInfo({...contactInfo, address: e.target.value})}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-opensam-gray-700">City</label>
+                  <Input
+                    placeholder="City"
+                    value={contactInfo.city}
+                    onChange={(e) => setContactInfo({...contactInfo, city: e.target.value})}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-opensam-gray-700">State</label>
+                  <Input
+                    placeholder="State"
+                    value={contactInfo.state}
+                    onChange={(e) => setContactInfo({...contactInfo, state: e.target.value})}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-opensam-gray-700">ZIP Code</label>
+                  <Input
+                    placeholder="ZIP code"
+                    value={contactInfo.zipCode}
+                    onChange={(e) => setContactInfo({...contactInfo, zipCode: e.target.value})}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-opensam-gray-700">Phone</label>
+                  <Input
+                    placeholder="Phone number"
+                    value={contactInfo.phone}
+                    onChange={(e) => setContactInfo({...contactInfo, phone: e.target.value})}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-opensam-gray-700">Email</label>
+                  <Input
+                    placeholder="Email address"
+                    value={contactInfo.email}
+                    onChange={(e) => setContactInfo({...contactInfo, email: e.target.value})}
+                    className="mt-1"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-sm font-medium text-opensam-gray-700">Website</label>
+                  <Input
+                    placeholder="Website URL (optional)"
+                    value={contactInfo.website}
+                    onChange={(e) => setContactInfo({...contactInfo, website: e.target.value})}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Save Button */}
+            <div className="flex justify-end space-x-4 pt-6 border-t border-opensam-gray-200">
+              <Button variant="outline" onClick={() => window.location.reload()}>
+                Reset
+              </Button>
+              <Button onClick={handleSaveProfile} disabled={!ueiSAM.trim() || !description.trim()}>
+                Save Company Profile
+              </Button>
+            </div>
+
+            {/* SAM Entity Data Display */}
+            {companyProfile?.samEntityData && (
+              <div className="mt-6 p-4 bg-opensam-gray-50 rounded-lg">
+                <h4 className="font-medium text-opensam-black mb-2">SAM.gov Entity Data</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="font-medium">CAGE Code:</span> {companyProfile.samEntityData.cageCode}
+                  </div>
+                  <div>
+                    <span className="font-medium">DUNS:</span> {companyProfile.samEntityData.duns}
+                  </div>
+                  <div>
+                    <span className="font-medium">Registration Status:</span> {companyProfile.samEntityData.registrationStatus}
+                  </div>
+                  <div>
+                    <span className="font-medium">Last Updated:</span> {new Date(companyProfile.samEntityData.lastUpdated).toLocaleDateString()}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

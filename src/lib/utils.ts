@@ -190,7 +190,11 @@ export function formatBytes(bytes: number, decimals: number = 2): string {
  */
 export function cosineSimilarity(a: number[], b: number[]): number {
   if (a.length !== b.length) {
-    throw new Error('Vectors must have the same length');
+    throw new Error(`Vectors must have the same length. Got ${a.length} and ${b.length} dimensions.`);
+  }
+  
+  if (a.length === 0) {
+    throw new Error('Vectors cannot be empty');
   }
   
   let dotProduct = 0;
@@ -203,7 +207,12 @@ export function cosineSimilarity(a: number[], b: number[]): number {
     normB += b[i] * b[i];
   }
   
-  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+  const denominator = Math.sqrt(normA) * Math.sqrt(normB);
+  if (denominator === 0) {
+    return 0; // Return 0 similarity for zero vectors
+  }
+  
+  return dotProduct / denominator;
 }
 
 /**

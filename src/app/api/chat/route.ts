@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { LLMProvider, LLMMessage, LLMResponse } from '@/types';
+import { vectorStoreUtils } from '@/lib/vectorStore';
 
 // Rate limiting configuration
 const RATE_LIMIT_WINDOW = 60000; // 1 minute
@@ -48,7 +49,9 @@ const SYSTEM_PROMPT = `You are OpenSAM AI, an expert assistant for SAM.gov (Syst
 
 When users ask about contracting opportunities, provide detailed, accurate information. If you need to search for specific opportunities, indicate that you'll search SAM.gov data. Always prioritize accuracy and compliance with federal regulations.
 
-Keep responses concise but comprehensive, and always consider the business context of government contracting.`;
+Keep responses concise but comprehensive, and always consider the business context of government contracting.
+
+You have access to a local vector database of SAM.gov opportunities, entities, and chat history. Use this context to provide more relevant and personalized responses.`;
 
 /**
  * Rate limiting middleware

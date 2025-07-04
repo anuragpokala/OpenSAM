@@ -8,7 +8,13 @@ import {
   ChatMessage, 
   SAMOpportunity, 
   SAMSearchFilters, 
-  UploadedFile 
+  UploadedFile,
+  WorkingList,
+  WorkingListItem,
+  VectorSearchResult,
+  SemanticSearchResult,
+  CompanyProfile,
+  SAMEntityData
 } from '@/types';
 import { generateId, generateUUID, encryptData, decryptData, generateEncryptionKey } from '@/lib/utils';
 
@@ -69,9 +75,23 @@ const initialState: AppState = {
   searchQuery: '',
   isSearching: false,
   favorites: [],
+  
+  // Vector Search State
+  vectorSearchResults: [],
+  semanticSearchResults: null,
+  isVectorSearching: false,
+  
+  // Working List State
+  workingLists: [],
+  currentWorkingList: null,
+  workingListItems: [],
+  isWorkingListLoading: false,
+  
   uploadedFiles: [],
   isUploading: false,
   uploadProgress: 0,
+  companyProfile: null,
+  isCompanyProfileLoading: false,
   sidebarOpen: true,
   currentView: 'chat',
   theme: 'light',
@@ -113,6 +133,24 @@ interface AppStore extends AppState {
   toggleFavorite: (opportunityId: string) => void;
   clearSearchResults: () => void;
   
+  // Vector Search Actions
+  setVectorSearchResults: (results: VectorSearchResult[]) => void;
+  setSemanticSearchResults: (results: SemanticSearchResult | null) => void;
+  setIsVectorSearching: (isSearching: boolean) => void;
+  performVectorSearch: (query: string, filters?: any) => Promise<void>;
+  
+  // Working List Actions
+  setWorkingLists: (lists: WorkingList[]) => void;
+  setCurrentWorkingList: (list: WorkingList | null) => void;
+  setWorkingListItems: (items: WorkingListItem[]) => void;
+  setIsWorkingListLoading: (loading: boolean) => void;
+  createWorkingList: (list: Omit<WorkingList, 'id' | 'createdAt' | 'updatedAt'>) => Promise<WorkingList>;
+  updateWorkingList: (listId: string, updates: Partial<WorkingList>) => Promise<void>;
+  deleteWorkingList: (listId: string) => Promise<void>;
+  addItemToWorkingList: (listId: string, item: Omit<WorkingListItem, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  updateWorkingListItem: (itemId: string, updates: Partial<WorkingListItem>) => Promise<void>;
+  removeItemFromWorkingList: (listId: string, itemId: string) => Promise<void>;
+  
   // Upload Actions
   addUploadedFile: (file: UploadedFile) => void;
   updateUploadedFile: (fileId: string, updates: Partial<UploadedFile>) => void;
@@ -120,6 +158,13 @@ interface AppStore extends AppState {
   setIsUploading: (isUploading: boolean) => void;
   setUploadProgress: (progress: number) => void;
   clearAllUploads: () => void;
+  
+  // Company Profile Actions
+  setCompanyProfile: (profile: CompanyProfile | null) => void;
+  updateCompanyProfile: (updates: Partial<CompanyProfile>) => void;
+  setIsCompanyProfileLoading: (loading: boolean) => void;
+  fetchSAMEntityData: (ueiSAM: string) => Promise<SAMEntityData | null>;
+  saveCompanyProfile: (profile: CompanyProfile) => Promise<void>;
   
   // UI Actions
   setSidebarOpen: (open: boolean) => void;
@@ -320,6 +365,182 @@ export const useAppStore = create<AppStore>()(
       clearSearchResults: () => 
         set({ searchResults: [] }),
       
+      // Vector Search Actions
+      setVectorSearchResults: (results) => 
+        set({ vectorSearchResults: results }),
+      
+      setSemanticSearchResults: (results) => 
+        set({ semanticSearchResults: results }),
+      
+      setIsVectorSearching: (isSearching) => 
+        set({ isVectorSearching: isSearching }),
+      
+      performVectorSearch: async (query, filters) => {
+        set({ isVectorSearching: true });
+        try {
+          const params = new URLSearchParams({ q: query });
+          if (filters?.type) params.append('type', filters.type.join(','));
+          if (filters?.tags) params.append('tags', filters.tags.join(','));
+          
+          const response = await fetch(`/api/vector-search?${params.toString()}`);
+          if (response.ok) {
+            const data = await response.json();
+            set({ 
+              vectorSearchResults: data.data.results,
+              semanticSearchResults: data.data,
+              isVectorSearching: false 
+            });
+          } else {
+            set({ isVectorSearching: false });
+          }
+        } catch (error) {
+          console.error('Vector search error:', error);
+          set({ isVectorSearching: false });
+        }
+      },
+      
+      // Working List Actions
+      setWorkingLists: (lists) => 
+        set({ workingLists: lists }),
+      
+      setCurrentWorkingList: (list) => 
+        set({ currentWorkingList: list }),
+      
+      setWorkingListItems: (items) => 
+        set({ workingListItems: items }),
+      
+      setIsWorkingListLoading: (loading) => 
+        set({ isWorkingListLoading: loading }),
+      
+      createWorkingList: async (list) => {
+        set({ isWorkingListLoading: true });
+        try {
+          const response = await fetch('/api/working-lists', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(list),
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            const newList = data.data.list;
+            set((state) => ({
+              workingLists: [...state.workingLists, newList],
+              isWorkingListLoading: false,
+            }));
+            return newList;
+          } else {
+            set({ isWorkingListLoading: false });
+            throw new Error('Failed to create working list');
+          }
+        } catch (error) {
+          set({ isWorkingListLoading: false });
+          throw error;
+        }
+      },
+      
+      updateWorkingList: async (listId, updates) => {
+        try {
+          const response = await fetch('/api/working-lists', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ listId, updates }),
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            const updatedList = data.data.list;
+            set((state) => ({
+              workingLists: state.workingLists.map(list => 
+                list.id === listId ? updatedList : list
+              ),
+              currentWorkingList: state.currentWorkingList?.id === listId 
+                ? updatedList 
+                : state.currentWorkingList,
+            }));
+          }
+        } catch (error) {
+          console.error('Update working list error:', error);
+        }
+      },
+      
+      deleteWorkingList: async (listId) => {
+        try {
+          const response = await fetch(`/api/working-lists?listId=${listId}`, {
+            method: 'DELETE',
+          });
+          
+          if (response.ok) {
+            set((state) => ({
+              workingLists: state.workingLists.filter(list => list.id !== listId),
+              currentWorkingList: state.currentWorkingList?.id === listId 
+                ? null 
+                : state.currentWorkingList,
+            }));
+          }
+        } catch (error) {
+          console.error('Delete working list error:', error);
+        }
+      },
+      
+      addItemToWorkingList: async (listId, item) => {
+        try {
+          const response = await fetch('/api/working-lists/items', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ listId, item }),
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            const newItem = data.data.item;
+            set((state) => ({
+              workingListItems: [...state.workingListItems, newItem],
+            }));
+          }
+        } catch (error) {
+          console.error('Add item to working list error:', error);
+        }
+      },
+      
+      updateWorkingListItem: async (itemId, updates) => {
+        try {
+          const response = await fetch('/api/working-lists/items', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ itemId, updates }),
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            const updatedItem = data.data.item;
+            set((state) => ({
+              workingListItems: state.workingListItems.map(item => 
+                item.id === itemId ? updatedItem : item
+              ),
+            }));
+          }
+        } catch (error) {
+          console.error('Update working list item error:', error);
+        }
+      },
+      
+      removeItemFromWorkingList: async (listId, itemId) => {
+        try {
+          const response = await fetch(`/api/working-lists/items?listId=${listId}&itemId=${itemId}`, {
+            method: 'DELETE',
+          });
+          
+          if (response.ok) {
+            set((state) => ({
+              workingListItems: state.workingListItems.filter(item => item.id !== itemId),
+            }));
+          }
+        } catch (error) {
+          console.error('Remove item from working list error:', error);
+        }
+      },
+      
       // Upload Actions
       addUploadedFile: (file) => 
         set((state) => ({
@@ -346,6 +567,60 @@ export const useAppStore = create<AppStore>()(
       
       clearAllUploads: () => 
         set({ uploadedFiles: [] }),
+      
+      // Company Profile Actions
+      setCompanyProfile: (profile) => 
+        set({ companyProfile: profile }),
+      
+      updateCompanyProfile: (updates) => 
+        set((state) => ({
+          companyProfile: state.companyProfile ? { ...state.companyProfile, ...updates, updatedAt: Date.now() } : null,
+        })),
+      
+      setIsCompanyProfileLoading: (loading) => 
+        set({ isCompanyProfileLoading: loading }),
+      
+      fetchSAMEntityData: async (ueiSAM) => {
+        try {
+          const samApiKey = get().samApiKey;
+          if (!samApiKey) {
+            throw new Error('SAM API key is required');
+          }
+          
+          const params = new URLSearchParams({
+            ueiSAM,
+            samApiKey,
+            limit: '1'
+          });
+          
+          const response = await fetch(`/api/sam-entity?${params.toString()}`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.data.entities && data.data.entities.length > 0) {
+              return data.data.entities[0];
+            }
+          }
+          return null;
+        } catch (error) {
+          console.error('Failed to fetch SAM entity data:', error);
+          return null;
+        }
+      },
+      
+      saveCompanyProfile: async (profile) => {
+        try {
+          // Save to localStorage for persistence
+          const profiles = JSON.parse(localStorage.getItem('opensam-company-profiles') || '{}');
+          profiles[profile.id] = profile;
+          localStorage.setItem('opensam-company-profiles', JSON.stringify(profiles));
+          
+          // Update store
+          set({ companyProfile: profile });
+        } catch (error) {
+          console.error('Failed to save company profile:', error);
+          throw error;
+        }
+      },
       
       // UI Actions
       setSidebarOpen: (open) => 
@@ -483,6 +758,21 @@ export const useUIState = () => useAppStore((state) => ({
 }));
 export const useFavorites = () => useAppStore((state) => state.favorites);
 export const useSettings = () => useAppStore((state) => state.settings);
+
+// Vector Search Selectors
+export const useVectorSearchResults = () => useAppStore((state) => state.vectorSearchResults);
+export const useSemanticSearchResults = () => useAppStore((state) => state.semanticSearchResults);
+export const useIsVectorSearching = () => useAppStore((state) => state.isVectorSearching);
+
+// Working List Selectors
+export const useWorkingLists = () => useAppStore((state) => state.workingLists);
+export const useCurrentWorkingList = () => useAppStore((state) => state.currentWorkingList);
+export const useWorkingListItems = () => useAppStore((state) => state.workingListItems);
+export const useIsWorkingListLoading = () => useAppStore((state) => state.isWorkingListLoading);
+
+// Company Profile Selectors
+export const useCompanyProfile = () => useAppStore((state) => state.companyProfile);
+export const useIsCompanyProfileLoading = () => useAppStore((state) => state.isCompanyProfileLoading);
 
 // Initialize store on first load
 if (typeof window !== 'undefined') {

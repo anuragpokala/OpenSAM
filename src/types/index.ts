@@ -210,6 +210,82 @@ export interface UploadedFile {
   };
 }
 
+// Company Profile Types
+export interface CompanyProfile {
+  id: string;
+  ueiSAM: string;
+  entityName: string;
+  description: string;
+  businessTypes: string[];
+  naicsCodes: string[];
+  capabilities: string[];
+  pastPerformance: string[];
+  certifications: string[];
+  contactInfo: {
+    address: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    phone: string;
+    email: string;
+    website: string;
+  };
+  samEntityData?: SAMEntityData;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface SAMEntityData {
+  ueiSAM: string;
+  entityName: string;
+  cageCode: string;
+  duns: string;
+  entityStructure: string;
+  businessTypes: string[];
+  registrationStatus: string;
+  registrationDate: string;
+  lastUpdated: string;
+  expirationDate: string;
+  address: {
+    line1: string;
+    line2?: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    country: string;
+  };
+  pointOfContact: {
+    name: string;
+    title: string;
+    phone: string;
+    email: string;
+  };
+  samStatus: string;
+  exclusionStatus: string;
+  hasDelinquentFederalDebt: boolean;
+  hasExclusions: boolean;
+  hasSuspensions: boolean;
+  hasDebarments: boolean;
+  hasIneligibilities: boolean;
+  hasAdministrativeAgreements: boolean;
+  hasSettlementAgreements: boolean;
+  hasVoluntaryExclusions: boolean;
+  hasProtests: boolean;
+  hasDisputes: boolean;
+  hasAppeals: boolean;
+  hasLitigation: boolean;
+  hasBankruptcy: boolean;
+  hasTaxDelinquencies: boolean;
+  hasEnvironmentalViolations: boolean;
+  hasLaborViolations: boolean;
+  hasSafetyViolations: boolean;
+  hasQualityViolations: boolean;
+  hasPerformanceIssues: boolean;
+  hasFinancialIssues: boolean;
+  hasComplianceIssues: boolean;
+  hasOtherIssues: boolean;
+}
+
 // Chart Types
 export interface ChartDataPoint {
   date: string;
@@ -249,10 +325,25 @@ export interface AppState {
   isSearching: boolean;
   favorites: string[];
   
+  // Vector Search State
+  vectorSearchResults: VectorSearchResult[];
+  semanticSearchResults: SemanticSearchResult | null;
+  isVectorSearching: boolean;
+  
+  // Working List State
+  workingLists: WorkingList[];
+  currentWorkingList: WorkingList | null;
+  workingListItems: WorkingListItem[];
+  isWorkingListLoading: boolean;
+  
   // Upload State
   uploadedFiles: UploadedFile[];
   isUploading: boolean;
   uploadProgress: number;
+  
+  // Company Profile State
+  companyProfile: CompanyProfile | null;
+  isCompanyProfileLoading: boolean;
   
   // UI State
   sidebarOpen: boolean;
@@ -363,3 +454,93 @@ export type Prettify<T> = {
 } & {};
 
 export type NonNullable<T> = T extends null | undefined ? never : T;
+
+// Vector Storage Types
+export interface VectorDocument {
+  id: string;
+  content: string;
+  metadata: {
+    type: 'opportunity' | 'entity' | 'document' | 'chat';
+    source: string;
+    title?: string;
+    description?: string;
+    tags?: string[];
+    timestamp: number;
+    [key: string]: any;
+  };
+  embedding: number[];
+  similarity?: number;
+}
+
+export interface VectorSearchResult {
+  document: VectorDocument;
+  score: number;
+  highlights?: string[];
+}
+
+export interface VectorSearchQuery {
+  text: string;
+  filters?: {
+    type?: string[];
+    tags?: string[];
+    dateRange?: {
+      from: number;
+      to: number;
+    };
+  };
+  limit?: number;
+  threshold?: number;
+}
+
+// Working List Types
+export interface WorkingListItem {
+  id: string;
+  type: 'opportunity' | 'entity' | 'document' | 'note';
+  itemId: string;
+  title: string;
+  description?: string;
+  status: 'active' | 'in-progress' | 'completed' | 'archived';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  tags: string[];
+  notes: string[];
+  createdAt: number;
+  updatedAt: number;
+  dueDate?: number;
+  assignedTo?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface WorkingList {
+  id: string;
+  name: string;
+  description?: string;
+  items: string[]; // Array of item IDs
+  tags: string[];
+  isPublic: boolean;
+  createdAt: number;
+  updatedAt: number;
+  createdBy: string;
+  collaborators?: string[];
+}
+
+// Enhanced Search Types
+export interface SemanticSearchResult {
+  query: string;
+  results: VectorSearchResult[];
+  totalResults: number;
+  searchTime: number;
+  filters?: Record<string, any>;
+}
+
+export interface SearchAnalytics {
+  query: string;
+  results: number;
+  filters: Record<string, any>;
+  timestamp: number;
+  sessionId?: string;
+  userActions?: {
+    clicked: string[];
+    favorited: string[];
+    addedToWorkingList: string[];
+  };
+}

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { withCache, generateCacheKey } from '@/lib/redis';
 
 // SAM.gov Entity API configuration
 const SAM_BASE_URL = process.env.SAM_BASE_URL || 'https://api.sam.gov';
@@ -56,6 +57,11 @@ async function searchSAMEntities(
   },
   samApiKey: string
 ): Promise<any[]> {
+  // Generate cache key based on filters
+  const cacheKey = generateCacheKey(JSON.stringify(filters), 'sam-entity');
+  
+  // Use cache wrapper
+  return withCache(cacheKey, async () => {
   const params = new URLSearchParams();
   
   // Add search parameters
@@ -150,6 +156,7 @@ async function searchSAMEntities(
     hasComplianceIssues: entity.hasComplianceIssues,
     hasOtherIssues: entity.hasOtherIssues,
   })) || [];
+  }, { prefix: 'sam-entity', ttl: 3600 }); // Cache for 1 hour
 }
 
 /**

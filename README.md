@@ -174,6 +174,94 @@ opensam-ai-dashboard/
    - Add your SAM API key to `.env.local`
    - Set appropriate rate limits in configuration
 
+### Adapter Architecture
+
+OpenSAM AI uses a flexible adapter pattern that allows easy switching between local and production environments:
+
+#### Cache Adapters
+- **Local Development**: Redis server
+- **Production**: Upstash Redis (Netlify-compatible)
+
+#### Vector Store Adapters
+- **Local Development**: ChromaDB
+- **Production**: Pinecone
+
+#### Environment Configuration
+
+The application automatically detects the environment and uses appropriate adapters:
+
+```env
+# Cache Configuration
+CACHE_PROVIDER=redis          # 'redis' (local) or 'upstash' (production)
+CACHE_URL=redis://localhost:6379
+CACHE_PASSWORD=your_password
+
+# Vector Store Configuration  
+VECTOR_STORE_PROVIDER=chroma  # 'chroma' (local) or 'pinecone' (production)
+VECTOR_STORE_URL=http://localhost:8000
+VECTOR_STORE_API_KEY=your_pinecone_key
+VECTOR_STORE_ENVIRONMENT=us-east-1-aws
+```
+
+### Local Development Setup
+
+#### 1. Redis Cache (Local)
+```bash
+# Install Redis
+brew install redis  # macOS
+sudo apt-get install redis-server  # Ubuntu
+
+# Start Redis
+redis-server --daemonize yes
+
+# Test connection
+redis-cli ping  # Should return PONG
+```
+
+#### 2. ChromaDB Vector Store (Local)
+```bash
+# Install ChromaDB
+pip install chromadb
+
+# Start ChromaDB server
+chroma run --host localhost --port 8000
+
+# Or use Docker
+docker run -p 8000:8000 chromadb/chroma
+```
+
+### Production Setup (Netlify)
+
+#### 1. Upstash Redis
+1. Create account at [upstash.com](https://upstash.com/)
+2. Create a Redis database
+3. Copy the REST URL and token to environment variables:
+   ```env
+   CACHE_PROVIDER=upstash
+   CACHE_URL=https://your-instance.upstash.io
+   CACHE_PASSWORD=your_token
+   ```
+
+#### 2. Pinecone Vector Database
+1. Create account at [pinecone.io](https://pinecone.io/)
+2. Create a new project and index
+3. Copy credentials to environment variables:
+   ```env
+   VECTOR_STORE_PROVIDER=pinecone
+   VECTOR_STORE_API_KEY=your_api_key
+   VECTOR_STORE_ENVIRONMENT=us-east-1-aws
+   VECTOR_STORE_PROJECT_ID=your_project_id
+   ```
+
+### Cache Management
+
+- **Monitor Cache**: Use the Settings panel to view cache statistics
+- **Clear Cache**: Clear specific prefixes or all cache data
+- **TTL Settings**: 
+  - SAM Search results: 30 minutes
+  - Entity data: 1 hour
+  - Automatic expiration based on usage patterns
+
 ## 🎯 Usage Guide
 
 ### Chat Interface
