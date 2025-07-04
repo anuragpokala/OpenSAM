@@ -7,7 +7,13 @@ export class ChromaVectorAdapter implements VectorStoreAdapter {
 
   constructor(config: { url?: string }) {
     const url = config.url || 'http://localhost:8000';
-    this.client = new ChromaClient({ path: url });
+    // Parse URL to get host and port
+    const urlObj = new URL(url);
+    this.client = new ChromaClient({ 
+      host: urlObj.hostname,
+      port: parseInt(urlObj.port) || 8000,
+      ssl: urlObj.protocol === 'https:'
+    });
     console.log('✅ ChromaDB client initialized');
   }
 

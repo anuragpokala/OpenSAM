@@ -112,3 +112,23 @@ storybook-static
 
 # Local Netlify folder
 .netlify
+
+# ChromaDB
+chroma/
+chromadb-env/
+*.chroma
+chroma_data/
+
+# Python virtual environments
+venv/
+env/
+.venv/
+.env/
+
+# Redis (if running locally)
+dump.rdb
+*.rdb
+
+# Local development data
+data/
+local_data/

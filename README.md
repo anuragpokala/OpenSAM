@@ -1,104 +1,87 @@
 # OpenSAM AI Dashboard
 
-> **The slickest black-and-white government contracting data dashboard on the planet** 🚀
+> **The slickest black-and-white government contracting data dashboard on the planet.**
+> 
+> Discover, search, and forecast government contract opportunities with AI. Built for the future of public sector innovation.
 
-OpenSAM AI is a production-ready, AI-powered dashboard for exploring SAM.gov contract opportunities with semantic search, intelligent chat interface, and forecasting capabilities. Built with React 18, TypeScript, and shadcn/ui components in a beautiful monochromatic design.
+[opensamai.com](https://opensamai.com)
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)
-![React](https://img.shields.io/badge/React-20232A?logo=react&logoColor=61DAFB)
-![Next.js](https://img.shields.io/badge/Next.js-000000?logo=nextdotjs&logoColor=white)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?logo=tailwind-css&logoColor=white)
+---
 
-## ✨ Features
+## 🚨 Disclaimer
+**OpenSAM AI is an independent open-source project and is _not affiliated with, endorsed by, or connected to SAM.gov, the U.S. General Services Administration, or any government agency in any way whatsoever_.**
 
-### 🤖 **Multi-LLM Chat Interface**
-- **Provider Flexibility**: Switch between OpenAI, Anthropic, and Hugging Face models on the fly
-- **Streaming Responses**: Real-time token streaming for responsive conversations
-- **SAM.gov Expertise**: Built-in system prompts with government contracting knowledge
-- **Secure Key Management**: Encrypted storage of API keys in browser localStorage
+---
 
-### 🔍 **Semantic Search Engine**
-- **Natural Language Queries**: Search using plain English (e.g., "AI software development contracts")
-- **Embedding-Powered Ranking**: Cosine similarity scoring for relevance-based results
-- **Advanced Filtering**: Date ranges, NAICS codes, agencies, set-asides, and more
-- **Favorites System**: Save and organize important opportunities
+## ✨ Why OpenSAM AI?
 
-### 📊 **Market Forecasting**
-- **Historical Trends**: Analyze contract patterns over time
-- **Predictive Analytics**: Forecast future opportunities based on past data
-- **Interactive Charts**: Recharts-powered visualizations with hover details
-- **Export Capabilities**: Download data in multiple formats
+- **Lightning-fast semantic search** for SAM.gov opportunities
+- **AI-powered chat** with multi-LLM support (OpenAI, Anthropic, Hugging Face)
+- **Market forecasting** and interactive analytics
+- **Document upload & RAG**: bring your own past performance docs
+- **Monochrome, accessible design**: beautiful, high-contrast, and mobile-first
+- **Open, hackable, and community-driven**
 
-### 📁 **Document Processing**
-- **Multi-Format Support**: PDF, CSV, and text file uploads up to 10MB
-- **AI Text Extraction**: Parse and analyze past performance documents
-- **Embedding Generation**: Convert documents to searchable vectors
-- **RAG Integration**: Reference uploaded content in chat conversations
-
-### 🎨 **Accessibility-First Design**
-- **Black & White Theme**: High-contrast, WCAG-compliant color scheme
-- **Keyboard Navigation**: Full keyboard accessibility support
-- **Screen Reader Friendly**: Semantic HTML with proper ARIA labels
-- **Responsive Layout**: Mobile-first design that scales beautifully
+---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-
-- **Node.js** 18.0.0 or later
-- **npm** or **yarn** package manager
-- **API Keys**: At least one of the following:
-  - OpenAI API key
-  - Anthropic API key
-  - Hugging Face API token
-- **SAM.gov API Key**: For accessing government contract data
+- Node.js 18+
+- npm or yarn
+- API keys (OpenAI, Anthropic, or Hugging Face)
+- SAM.gov API key (for real data)
 
 ### Installation
+```bash
+git clone https://github.com/your-org/opensam-ai-dashboard.git
+cd opensam-ai-dashboard
+npm install
+cp .env.example .env.local
+# Add your API keys to .env.local
+npm run dev
+```
+Visit [http://localhost:3000](http://localhost:3000)
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/your-org/opensam-ai-dashboard.git
-   cd opensam-ai-dashboard
-   ```
+---
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   # or
-   yarn install
-   ```
+## 🔧 Setup & Configuration
 
-3. **Environment setup**
-   ```bash
-   cp .env.example .env.local
-   ```
+### 📋 Quick Setup Guides
+- **[Environment Configuration](env.example)** - Copy to `.env.local` and add your API keys
+- **[ChromaDB Local Setup](CHROMADB_SETUP.md)** - Vector database for local development
+- **[API Keys Setup](test-api-keys.js)** - Test your API keys are working
+- **[SAM.gov API Test](test-sam-api.js)** - Verify SAM.gov API connectivity
 
-4. **Configure environment variables**
-   ```env
-   # LLM Provider API Keys
-   OPENAI_API_KEY=your_openai_api_key_here
-   ANTHROPIC_API_KEY=your_anthropic_api_key_here
-   HUGGINGFACE_API_KEY=your_huggingface_api_key_here
-   
-   # SAM.gov Configuration
-   SAM_API_KEY=your_sam_gov_api_key_here
-   SAM_BASE_URL=https://api.sam.gov
-   
-   # Application Configuration
-   NEXT_PUBLIC_APP_URL=http://localhost:3000
-   NEXT_PUBLIC_APP_NAME=OpenSAM AI Dashboard
-   ```
+### 🛠️ Local Development Tools
+```bash
+# Setup ChromaDB (vector database)
+npm run setup:chromadb
 
-5. **Start the development server**
-   ```bash
-   npm run dev
-   # or
-   yarn dev
-   ```
+# Test ChromaDB connection
+npm run test:chromadb
 
-6. **Open your browser**
-   Navigate to [http://localhost:3000](http://localhost:3000)
+# Test API keys
+node test-api-keys.js
+
+# Test SAM.gov API
+node test-sam-api.js
+```
+
+### 🔄 Environment Switching
+The app automatically switches between local and production environments:
+
+**Local Development:**
+- Cache: Redis (localhost:6379)
+- Vector Store: ChromaDB (localhost:8000)
+
+**Production:**
+- Cache: Upstash Redis
+- Vector Store: Pinecone
+
+See [Environment Configuration](env.example) for all available options.
+
+---
 
 ## 🏗️ Project Structure
 
@@ -431,76 +414,48 @@ npm run lighthouse
 - **Input Validation**: Comprehensive request validation
 - **Error Handling**: No sensitive data in error messages
 
-## 🤝 Contributing
+## 🤝 Get Involved! 🚀
 
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
+OpenSAM AI is built by and for the community. We want YOU to get involved—whether you're a developer, designer, data nerd, policy wonk, or just passionate about open government and AI.
 
-### Development Workflow
+- **Fork, hack, and PR your ideas** — see [CONTRIBUTING.md](CONTRIBUTING.md)
+- **Share feedback, feature requests, or bug reports**
+- **Collaborate on new features, integrations, or research**
+- **Help us make government data more accessible and useful for everyone!**
 
-1. **Fork & Clone**
-   ```bash
-   git clone https://github.com/your-username/opensam-ai-dashboard.git
-   cd opensam-ai-dashboard
-   ```
+### Connect with Akshay (Project Lead)
+- **LinkedIn:** [akshayakula](https://www.linkedin.com/in/akshayakula/)
+- **X (Twitter):** [@akshay_akula](https://x.com/akshay_akula)
+- **Instagram:** [@akshayakula](https://instagram.com/akshayakula)
 
-2. **Create Feature Branch**
-   ```bash
-   git checkout -b feature/amazing-feature
-   ```
+**DMs are open! No email, no cap. If you want to get involved, reach out on any of the above.**
 
-3. **Make Changes**
-   - Follow TypeScript strict mode
-   - Add tests for new functionality
-   - Update documentation as needed
+---
 
-4. **Test Your Changes**
-   ```bash
-   npm run test
-   npm run test:e2e
-   npm run lint
-   ```
+## 🆘 Support & Community
+- [Website](https://opensamai.com)
+- [Docs](https://opensamai.com/docs)
+- [Discord](https://discord.gg/opensam-ai)
+- [Issue Tracker](https://github.com/your-org/opensam-ai-dashboard/issues)
 
-5. **Submit Pull Request**
-   - Clear description of changes
-   - Link to any related issues
-   - Ensure all CI checks pass
+---
 
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🆘 Support
-
-### Documentation
-- [API Documentation](docs/api.md)
-- [Component Library](docs/components.md)
-- [Deployment Guide](docs/deployment.md)
-
-### Community
-- 💬 [Discord Server](https://discord.gg/opensam-ai)
-- 🐛 [Issue Tracker](https://github.com/your-org/opensam-ai-dashboard/issues)
-- 📧 [Email Support](mailto:support@opensam-ai.com)
-
-### FAQ
+## FAQ
 
 **Q: Can I use this without SAM.gov API access?**
-A: The application includes mock data for development, but production use requires a valid SAM.gov API key.
+A: Yes, mock data is included for dev. For real data, get a SAM.gov API key.
 
-**Q: Which LLM provider gives the best results?**
-A: All providers work well. OpenAI GPT-4 tends to give the most accurate government contracting advice, while Anthropic Claude excels at document analysis.
+**Q: Which LLM provider is best?**
+A: OpenAI GPT-4 is top for gov contracting, Anthropic Claude is great for document analysis.
 
 **Q: Is my API key secure?**
-A: Yes, API keys are encrypted client-side and never transmitted to our servers in plain text.
+A: Yes, keys are encrypted client-side and never sent to our servers.
 
 **Q: Can I customize the color scheme?**
-A: The application is designed specifically for black-and-white accessibility. Theme customization would require significant CSS modifications.
+A: The app is designed for black-and-white accessibility. Customization would require CSS changes.
 
 ---
 
 <div align="center">
-
-**Built with ❤️ for the government contracting community**
-
-[Website](https://opensam-ai.com) • [Documentation](https://docs.opensam-ai.com) • [Community](https://discord.gg/opensam-ai)
-
+Built with ❤️ for the government contracting and AI community — [opensamai.com](https://opensamai.com)
 </div>
