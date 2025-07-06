@@ -559,4 +559,4 @@ setInterval(() => {
   });
 }, 5 * 60 * 1000); // Run every 5 minutes
 
-export { SAM_RATE_LIMIT_WINDOW, SAM_RATE_LIMIT_MAX_REQUESTS };
+// Rate limit configuration for internal use only

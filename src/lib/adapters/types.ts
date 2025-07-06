@@ -46,7 +46,7 @@ export interface VectorSearchResult {
 // Environment Configuration
 export interface EnvironmentConfig {
   cache: {
-    provider: 'redis' | 'upstash';
+    provider: 'redis' | 'upstash' | 'browser';
     url?: string;
     password?: string;
     database?: number;

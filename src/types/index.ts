@@ -230,60 +230,222 @@ export interface CompanyProfile {
     email: string;
     website: string;
   };
+  // AI-enhanced fields
+  aiEnhanced?: {
+    industry: string;
+    companySize: string;
+    foundingYear?: number;
+    revenue?: string;
+    employeeCount?: string;
+    enhancedDescription: string;
+    keyProducts: string[];
+    targetMarkets: string[];
+    competitiveAdvantages: string[];
+    technologyStack?: string[];
+    partnerships?: string[];
+    awards?: string[];
+    lastEnhanced: number;
+  };
   samEntityData?: SAMEntityData;
   createdAt: number;
   updatedAt: number;
 }
 
 export interface SAMEntityData {
-  ueiSAM: string;
-  entityName: string;
-  cageCode: string;
-  duns: string;
-  entityStructure: string;
-  businessTypes: string[];
-  registrationStatus: string;
-  registrationDate: string;
-  lastUpdated: string;
-  expirationDate: string;
-  address: {
-    line1: string;
-    line2?: string;
-    city: string;
-    state: string;
-    zipCode: string;
-    country: string;
+  // SAM.gov API response structure
+  entityRegistration: {
+    samRegistered: string;
+    ueiSAM: string;
+    entityEFTIndicator: string | null;
+    cageCode: string;
+    dodaac: string | null;
+    legalBusinessName: string;
+    dbaName: string | null;
+    purposeOfRegistrationCode: string;
+    purposeOfRegistrationDesc: string;
+    registrationStatus: string;
+    evsSource: string;
+    registrationDate: string;
+    lastUpdateDate: string;
+    registrationExpirationDate: string;
+    activationDate: string;
+    ueiStatus: string;
+    ueiExpirationDate: string | null;
+    ueiCreationDate: string;
+    publicDisplayFlag: string;
+    exclusionStatusFlag: string;
+    exclusionURL: string | null;
+    dnbOpenData: string | null;
   };
-  pointOfContact: {
-    name: string;
-    title: string;
-    phone: string;
-    email: string;
+  coreData: {
+    entityInformation: {
+      entityURL: string;
+      entityDivisionName: string | null;
+      entityDivisionNumber: string | null;
+      entityStartDate: string;
+      fiscalYearEndCloseDate: string;
+      submissionDate: string;
+    };
+    physicalAddress: {
+      addressLine1: string;
+      addressLine2: string | null;
+      city: string;
+      stateOrProvinceCode: string;
+      zipCode: string;
+      zipCodePlus4: string;
+      countryCode: string;
+    };
+    mailingAddress: {
+      addressLine1: string;
+      addressLine2: string | null;
+      city: string;
+      stateOrProvinceCode: string;
+      zipCode: string;
+      zipCodePlus4: string;
+      countryCode: string;
+    };
+    congressionalDistrict: string;
+    generalInformation: {
+      entityStructureCode: string;
+      entityStructureDesc: string;
+      entityTypeCode: string;
+      entityTypeDesc: string;
+      profitStructureCode: string;
+      profitStructureDesc: string;
+      organizationStructureCode: string | null;
+      organizationStructureDesc: string | null;
+      stateOfIncorporationCode: string;
+      stateOfIncorporationDesc: string;
+      countryOfIncorporationCode: string;
+      countryOfIncorporationDesc: string;
+    };
+    businessTypes: {
+      businessTypeList: Array<{
+        businessTypeCode: string;
+        businessTypeDesc: string;
+      }>;
+      sbaBusinessTypeList: Array<{
+        sbaBusinessTypeCode: string | null;
+        sbaBusinessTypeDesc: string | null;
+        certificationEntryDate: string | null;
+        certificationExitDate: string | null;
+      }>;
+    };
+    financialInformation: {
+      creditCardUsage: string;
+      debtSubjectToOffset: string;
+    };
   };
-  samStatus: string;
-  exclusionStatus: string;
-  hasDelinquentFederalDebt: boolean;
-  hasExclusions: boolean;
-  hasSuspensions: boolean;
-  hasDebarments: boolean;
-  hasIneligibilities: boolean;
-  hasAdministrativeAgreements: boolean;
-  hasSettlementAgreements: boolean;
-  hasVoluntaryExclusions: boolean;
-  hasProtests: boolean;
-  hasDisputes: boolean;
-  hasAppeals: boolean;
-  hasLitigation: boolean;
-  hasBankruptcy: boolean;
-  hasTaxDelinquencies: boolean;
-  hasEnvironmentalViolations: boolean;
-  hasLaborViolations: boolean;
-  hasSafetyViolations: boolean;
-  hasQualityViolations: boolean;
-  hasPerformanceIssues: boolean;
-  hasFinancialIssues: boolean;
-  hasComplianceIssues: boolean;
-  hasOtherIssues: boolean;
+  assertions: {
+    goodsAndServices: {
+      primaryNaics: string;
+      naicsList: Array<{
+        naicsCode: string;
+        naicsDescription: string;
+        sbaSmallBusiness: string;
+        naicsException: string | null;
+      }>;
+      pscList: Array<{
+        pscCode: string;
+        pscDescription: string;
+      }>;
+    };
+    disasterReliefData: {
+      disasterRegistryFlag: string;
+      bondingFlag: string;
+      geographicalAreaServed: Array<{
+        geographicalAreaServedStateCode: string | null;
+        geographicalAreaServedStateName: string | null;
+        geographicalAreaServedCountyCode: string | null;
+        geographicalAreaServedCountyName: string | null;
+        geographicalAreaServedmetropol: string | null;
+        geographicalAreaServedmetropolitanStatisticalAreaName: string | null;
+      }>;
+    };
+    ediInformation: {
+      ediInformationFlag: string;
+    };
+  };
+  pointsOfContact: {
+    governmentBusinessPOC: {
+      firstName: string;
+      middleInitial: string | null;
+      lastName: string;
+      title: string | null;
+      addressLine1: string;
+      addressLine2: string | null;
+      city: string;
+      stateOrProvinceCode: string;
+      zipCode: string;
+      zipCodePlus4: string | null;
+      countryCode: string;
+    };
+    electronicBusinessPOC: {
+      firstName: string;
+      middleInitial: string | null;
+      lastName: string;
+      title: string | null;
+      addressLine1: string;
+      addressLine2: string | null;
+      city: string;
+      stateOrProvinceCode: string;
+      zipCode: string;
+      zipCodePlus4: string | null;
+      countryCode: string;
+    };
+    governmentBusinessAlternatePOC: {
+      firstName: string | null;
+      middleInitial: string | null;
+      lastName: string | null;
+      title: string | null;
+      addressLine1: string | null;
+      addressLine2: string | null;
+      city: string | null;
+      stateOrProvinceCode: string | null;
+      zipCode: string | null;
+      zipCodePlus4: string | null;
+      countryCode: string | null;
+    };
+    electronicBusinessAlternatePOC: {
+      firstName: string | null;
+      middleInitial: string | null;
+      lastName: string | null;
+      title: string | null;
+      addressLine1: string | null;
+      addressLine2: string | null;
+      city: string | null;
+      stateOrProvinceCode: string | null;
+      zipCode: string | null;
+      zipCodePlus4: string | null;
+      countryCode: string | null;
+    };
+    pastPerformancePOC: {
+      firstName: string | null;
+      middleInitial: string | null;
+      lastName: string | null;
+      title: string | null;
+      addressLine1: string | null;
+      addressLine2: string | null;
+      city: string | null;
+      stateOrProvinceCode: string | null;
+      zipCode: string | null;
+      zipCodePlus4: string | null;
+      countryCode: string | null;
+    };
+    pastPerformanceAlternatePOC: {
+      firstName: string | null;
+      middleInitial: string | null;
+      lastName: string | null;
+      title: string | null;
+      addressLine1: string | null;
+      addressLine2: string | null;
+      city: string | null;
+      stateOrProvinceCode: string | null;
+      zipCode: string | null;
+      zipCodePlus4: string | null;
+      countryCode: string | null;
+    };
+  };
 }
 
 // Chart Types
@@ -336,10 +498,7 @@ export interface AppState {
   workingListItems: WorkingListItem[];
   isWorkingListLoading: boolean;
   
-  // Upload State
-  uploadedFiles: UploadedFile[];
-  isUploading: boolean;
-  uploadProgress: number;
+
   
   // Company Profile State
   companyProfile: CompanyProfile | null;
@@ -347,7 +506,7 @@ export interface AppState {
   
   // UI State
   sidebarOpen: boolean;
-  currentView: 'chat' | 'search' | 'forecast' | 'upload';
+  currentView: 'chat' | 'search' | 'forecast' | 'upload' | 'vectorstore';
   theme: 'light' | 'dark';
   
   // Settings
@@ -358,6 +517,14 @@ export interface AppState {
     notifications: boolean;
     analytics: boolean;
   };
+  
+  // Cache State
+  lastSearchCached: boolean;
+  lastSearchTimestamp: number | null;
+  cacheNotificationDismissed: boolean;
+  
+  // Chat Prepopulated Message State
+  prepopulatedMessage: string | null;
 }
 
 // API Types

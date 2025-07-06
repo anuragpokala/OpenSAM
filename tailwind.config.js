@@ -52,20 +52,20 @@ module.exports = {
         },
         // Custom OpenSAM AI black and white palette
         'opensam': {
-          'black': '#000000',
-          'white': '#ffffff',
+          'black': 'hsl(var(--opensam-black))',
+          'white': 'hsl(var(--opensam-white))',
           'gray': {
-            50: '#f9f9f9',
-            100: '#f5f5f5',
-            200: '#e5e5e5',
-            300: '#d4d4d4',
-            400: '#a3a3a3',
-            500: '#737373',
-            600: '#525252',
-            700: '#404040',
-            800: '#262626',
-            900: '#171717',
-            950: '#0a0a0a',
+            50: 'hsl(var(--opensam-gray-50))',
+            100: 'hsl(var(--opensam-gray-100))',
+            200: 'hsl(var(--opensam-gray-200))',
+            300: 'hsl(var(--opensam-gray-300))',
+            400: 'hsl(var(--opensam-gray-400))',
+            500: 'hsl(var(--opensam-gray-500))',
+            600: 'hsl(var(--opensam-gray-600))',
+            700: 'hsl(var(--opensam-gray-700))',
+            800: 'hsl(var(--opensam-gray-800))',
+            900: 'hsl(var(--opensam-gray-900))',
+            950: 'hsl(var(--opensam-gray-950))',
           }
         }
       },

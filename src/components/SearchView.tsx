@@ -8,7 +8,6 @@ import {
   Download, 
   Plus, 
   Bookmark, 
-  MessageSquare,
   Calendar,
   MapPin,
   Building,
@@ -16,21 +15,15 @@ import {
   FileText,
   Sparkles,
   List,
-  CheckCircle,
-  Clock,
-  AlertCircle
+  CheckCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select';
+
 import { Badge } from '@/components/ui/badge';
+import { CacheIndicator, CacheNotification } from '@/components/ui/cache-indicator';
+import { LoadingSpinner, ButtonSpinner } from '@/components/ui/loading-spinner';
 
 import { 
   useAppStore, 
@@ -186,7 +179,18 @@ export default function SearchView() {
     performVectorSearch,
     createWorkingList,
     addItemToWorkingList,
-    setCurrentWorkingList
+    setCurrentWorkingList,
+    setPrepopulatedMessage,
+    setCurrentView,
+    // Cache actions
+    setLastSearchCached,
+    dismissCacheNotification,
+    lastSearchCached,
+    lastSearchTimestamp,
+    cacheNotificationDismissed,
+    // State
+    isSearching,
+    isVectorSearching
   } = useAppStore();
 
   // Perform search
@@ -256,6 +260,24 @@ export default function SearchView() {
         const data = await response.json();
         if (data.success) {
           setSearchResults(data.data.opportunities);
+          // Track cache status
+          setLastSearchCached(data.cached || false, data.timestamp);
+          // Reset cache notification dismissal for new searches
+          if (data.cached && cacheNotificationDismissed) {
+            useAppStore.setState({ cacheNotificationDismissed: false });
+          }
+          
+          // Add opportunities to vector store for future matching
+          try {
+            const { vectorStoreUtils } = await import('@/lib/vectorStore');
+            for (const opportunity of data.data.opportunities) {
+              await vectorStoreUtils.addOpportunity(opportunity);
+            }
+            console.log(`✅ Added ${data.data.opportunities.length} opportunities to vector store`);
+          } catch (vectorError) {
+            console.warn('⚠️ Failed to add opportunities to vector store:', vectorError);
+            // Don't fail the search if vector store is unavailable
+          }
         } else {
           console.error('Search API error:', data.error);
           alert(`Search failed: ${data.error}`);
@@ -285,12 +307,30 @@ export default function SearchView() {
   };
 
   // Handle preset message for chat
-  const handlePresetMessage = (preset: typeof PRESET_MESSAGES[0]) => {
-    // This will be handled by the chat component
-    // For now, we'll store it in localStorage for the chat to pick up
-    localStorage.setItem('opensam-preset-message', preset.message);
-    // Switch to chat view
-    useAppStore.getState().setCurrentView('chat');
+  const handlePresetMessage = (preset: typeof PRESET_MESSAGES[0], opportunity?: SAMOpportunity) => {
+    let message = preset.message;
+    
+    // If opportunity is provided, include its details in the message
+    if (opportunity) {
+      const opportunityDetails = `
+Opportunity Details:
+- Title: ${opportunity.title}
+- Type: ${opportunity.type}
+- NAICS Code: ${opportunity.naicsCode}
+- Synopsis: ${opportunity.synopsis}
+- Response Deadline: ${opportunity.responseDeadLine}
+- Location: ${opportunity.placeOfPerformance?.state?.name || 'Not specified'}
+- Estimated Value: ${opportunity.estimatedValue ? `$${opportunity.estimatedValue.toLocaleString()}` : 'Not specified'}
+- Set-Aside: ${opportunity.typeOfSetAsideDescription || 'Not specified'}
+
+${preset.message}`;
+      
+      message = opportunityDetails;
+    }
+    
+    // Set the prepopulated message and navigate to chat
+    setPrepopulatedMessage(message);
+    setCurrentView('chat');
   };
 
   // Add opportunity to working list
@@ -364,16 +404,33 @@ export default function SearchView() {
           <div className="space-y-4">
             {/* Main Search Bar */}
             <div className="flex space-x-2">
-              <Input
-                placeholder="Search for opportunities... (e.g., 'AI software development contracts')"
-                className="flex-1"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-              />
-              <Button onClick={handleSearch}>
-                <Search className="h-4 w-4 mr-2" />
-                Search
+              <div className="relative flex-1">
+                <Input
+                  placeholder="Search for opportunities... (e.g., 'AI software development contracts')"
+                  className="flex-1"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                  disabled={isSearching}
+                />
+                {isSearching && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    <ButtonSpinner size="sm" />
+                  </div>
+                )}
+              </div>
+              <Button onClick={handleSearch} disabled={isSearching}>
+                {isSearching ? (
+                  <>
+                    <ButtonSpinner size="sm" />
+                    <span className="ml-2">Searching...</span>
+                  </>
+                ) : (
+                  <>
+                    <Search className="h-4 w-4 mr-2" />
+                    Search
+                  </>
+                )}
               </Button>
             </div>
 
@@ -383,6 +440,7 @@ export default function SearchView() {
                 variant="outline" 
                 size="sm"
                 onClick={() => setShowFilters(!showFilters)}
+                disabled={isSearching}
               >
                 <Filter className="h-4 w-4 mr-2" />
                 Filters
@@ -392,6 +450,7 @@ export default function SearchView() {
                 variant="outline" 
                 size="sm"
                 onClick={() => setShowPresets(!showPresets)}
+                disabled={isSearching}
               >
                 <Sparkles className="h-4 w-4 mr-2" />
                 Preset Queries
@@ -401,17 +460,18 @@ export default function SearchView() {
                 variant="outline" 
                 size="sm"
                 onClick={() => setShowWorkingLists(!showWorkingLists)}
+                disabled={isSearching}
               >
                 <List className="h-4 w-4 mr-2" />
                 Working Lists
               </Button>
               
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" disabled={isSearching}>
                 <Star className="h-4 w-4 mr-2" />
                 Favorites
               </Button>
               
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" disabled={isSearching}>
                 <Download className="h-4 w-4 mr-2" />
                 Export
               </Button>
@@ -426,16 +486,7 @@ export default function SearchView() {
                 </div>
                 <div>
                   <label className="text-sm font-medium">State</label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select state" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="VA">Virginia</SelectItem>
-                      <SelectItem value="DC">District of Columbia</SelectItem>
-                      <SelectItem value="MD">Maryland</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Input placeholder="e.g., VA, DC, MD" />
                 </div>
                 <div>
                   <label className="text-sm font-medium">Agency</label>
@@ -454,12 +505,18 @@ export default function SearchView() {
                     return (
                       <Card 
                         key={preset.id} 
-                        className="cursor-pointer hover:shadow-md transition-shadow"
-                        onClick={() => handlePresetQuery(preset)}
+                        className={`cursor-pointer hover:shadow-md transition-shadow ${
+                          isSearching ? 'opacity-50 pointer-events-none' : ''
+                        }`}
+                        onClick={() => !isSearching && handlePresetQuery(preset)}
                       >
                         <CardContent className="p-4">
                           <div className="flex items-center space-x-2 mb-2">
-                            <Icon className="h-4 w-4 text-blue-600" />
+                            {isSearching ? (
+                              <ButtonSpinner size="sm" />
+                            ) : (
+                              <Icon className="h-4 w-4 text-blue-600" />
+                            )}
                             <h4 className="font-medium">{preset.label}</h4>
                           </div>
                           <p className="text-sm text-gray-600">{preset.description}</p>
@@ -523,12 +580,43 @@ export default function SearchView() {
       </Card>
 
       {/* Search Results */}
-      {searchResults.length > 0 && (
+      {isSearching && (
+        <Card>
+          <CardContent className="p-12">
+            <LoadingSpinner 
+              size="lg" 
+              text="Searching for opportunities..." 
+              variant="default"
+            />
+          </CardContent>
+        </Card>
+      )}
+      
+      {searchResults.length > 0 && !isSearching && (
         <div className="space-y-4">
+          {/* Cache Notification */}
+          {lastSearchCached && !cacheNotificationDismissed && (
+            <CacheNotification
+              cached={lastSearchCached}
+              timestamp={lastSearchTimestamp || undefined}
+              onDismiss={dismissCacheNotification}
+              className="mb-4"
+            />
+          )}
+          
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">
-              Search Results ({searchResults.length})
-            </h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-xl font-semibold">
+                Search Results ({searchResults.length})
+              </h2>
+              {lastSearchCached && (
+                <CacheIndicator
+                  cached={lastSearchCached}
+                  timestamp={lastSearchTimestamp || undefined}
+                  variant="subtle"
+                />
+              )}
+            </div>
             {selectedOpportunities.length > 0 && (
               <div className="flex space-x-2">
                 <Button 
@@ -558,7 +646,7 @@ export default function SearchView() {
                 onToggleSelection={() => toggleOpportunitySelection(opportunity.id)}
                 onAddToWorkingList={() => handleAddToWorkingList(opportunity)}
                 onToggleFavorite={() => toggleFavorite(opportunity.id)}
-                onPresetMessage={handlePresetMessage}
+                onPresetMessage={(preset) => handlePresetMessage(preset, opportunity)}
               />
             ))}
           </div>
@@ -566,7 +654,28 @@ export default function SearchView() {
       )}
 
       {/* Vector Search Results */}
-      {vectorResults.length > 0 && (
+      {isVectorSearching && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Sparkles className="h-5 w-5 mr-2" />
+              Related Content
+            </CardTitle>
+            <CardDescription>
+              AI-powered semantic search results from your stored data
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-8">
+            <LoadingSpinner 
+              size="md" 
+              text="Finding related content..." 
+              variant="default"
+            />
+          </CardContent>
+        </Card>
+      )}
+      
+      {vectorResults.length > 0 && !isVectorSearching && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center">
@@ -603,7 +712,7 @@ export default function SearchView() {
       )}
 
       {/* Empty State */}
-      {searchResults.length === 0 && !showFilters && !showPresets && !showWorkingLists && (
+      {searchResults.length === 0 && !isSearching && !showFilters && !showPresets && !showWorkingLists && (
         <Card>
           <CardContent className="p-12 text-center">
             <Search className="h-12 w-12 mx-auto mb-4 text-gray-400" />

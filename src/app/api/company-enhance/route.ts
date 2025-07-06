@@ -1,11 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { LLMProvider, LLMMessage, LLMResponse } from '@/types';
-import { vectorStoreUtils } from '@/lib/vectorStore';
-
-// Rate limiting configuration
-const RATE_LIMIT_WINDOW = 60000; // 1 minute
-const RATE_LIMIT_MAX_REQUESTS = 20;
-const rateLimitMap = new Map<string, { count: number; timestamp: number }>();
 
 // LLM Provider configurations
 const LLM_CONFIGS = {
@@ -28,7 +22,7 @@ const LLM_CONFIGS = {
   },
   huggingface: {
     baseUrl: 'https://api-inference.huggingface.co/models',
-    chatEndpoint: '', // Will be constructed per model
+    chatEndpoint: '',
     headers: (apiKey: string) => ({
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
@@ -36,114 +30,57 @@ const LLM_CONFIGS = {
   },
 };
 
-// System prompt for SAM.gov expertise
-const SYSTEM_PROMPT = `You are OpenSAM AI, an expert assistant for SAM.gov (System for Award Management) government contracting opportunities. Your expertise includes:
+// System prompt for company profile enhancement
+const ENHANCEMENT_PROMPT = `You are an expert business analyst specializing in company research and profile enhancement. Your task is to analyze a company based on its name and website to create a comprehensive business profile.
 
-- Government contracting processes and terminology
-- SAM.gov opportunity analysis and search
-- Contract award history and trends
-- NAICS codes and industry classifications
-- Set-aside programs and small business categories
-- Federal procurement regulations (FAR)
-- Proposal writing and past performance evaluation
+Please provide the following information in a structured JSON format:
 
-When users ask about contracting opportunities, provide detailed, accurate information. If you need to search for specific opportunities, indicate that you'll search SAM.gov data. Always prioritize accuracy and compliance with federal regulations.
-
-Keep responses concise but comprehensive, and always consider the business context of government contracting.
-
-You have access to a local vector database of SAM.gov opportunities, entities, and chat history. Use this context to provide more relevant and personalized responses.`;
-
-/**
- * Rate limiting middleware
- */
-function checkRateLimit(req: NextRequest): boolean {
-  const clientIp = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
-  const now = Date.now();
-  
-  const clientData = rateLimitMap.get(clientIp as string);
-  
-  if (!clientData) {
-    rateLimitMap.set(clientIp as string, { count: 1, timestamp: now });
-    return true;
-  }
-  
-  // Reset if window has passed
-  if (now - clientData.timestamp > RATE_LIMIT_WINDOW) {
-    rateLimitMap.set(clientIp as string, { count: 1, timestamp: now });
-    return true;
-  }
-  
-  // Check if limit exceeded
-  if (clientData.count >= RATE_LIMIT_MAX_REQUESTS) {
-    return false;
-  }
-  
-  // Increment count
-  clientData.count++;
-  return true;
+{
+  "industry": "Primary industry classification",
+  "companySize": "Small/Medium/Large/Enterprise",
+  "foundingYear": "Year founded (if available)",
+  "revenue": "Revenue range (if available)",
+  "employeeCount": "Employee count range (if available)",
+  "enhancedDescription": "Detailed 2-3 paragraph description of the company's business, mission, and value proposition",
+  "keyProducts": ["Product 1", "Product 2", "Product 3"],
+  "targetMarkets": ["Market 1", "Market 2", "Market 3"],
+  "competitiveAdvantages": ["Advantage 1", "Advantage 2", "Advantage 3"],
+  "technologyStack": ["Technology 1", "Technology 2"],
+  "partnerships": ["Partner 1", "Partner 2"],
+  "awards": ["Award 1", "Award 2"]
 }
 
-/**
- * Format messages for OpenAI API
- */
-function formatOpenAIMessages(messages: LLMMessage[]): any[] {
-  return [
-    { role: 'system', content: SYSTEM_PROMPT },
-    ...messages.map(msg => ({
-      role: msg.role === 'assistant' ? 'assistant' : 'user',
-      content: msg.content,
-    }))
-  ];
-}
+Guidelines:
+- Be factual and professional
+- Focus on information relevant to government contracting
+- If information is not available, omit the field or use "Not available"
+- Keep descriptions concise but comprehensive
+- Ensure all arrays have at least 2-3 items
+- Make the enhanced description compelling for government contracting opportunities
+
+Return ONLY the JSON object, no additional text.`;
 
 /**
- * Format messages for Anthropic API
- */
-function formatAnthropicMessages(messages: LLMMessage[]): any {
-  const userMessages = messages.filter(msg => msg.role !== 'system');
-  return {
-    system: SYSTEM_PROMPT,
-    messages: userMessages.map(msg => ({
-      role: msg.role === 'assistant' ? 'assistant' : 'user',
-      content: msg.content,
-    }))
-  };
-}
-
-/**
- * Format messages for Hugging Face API
- */
-function formatHuggingFaceMessages(messages: LLMMessage[]): any {
-  const conversationText = messages.map(msg => {
-    const prefix = msg.role === 'user' ? 'Human: ' : 'Assistant: ';
-    return prefix + msg.content;
-  }).join('\n\n');
-  
-  return {
-    inputs: `${SYSTEM_PROMPT}\n\n${conversationText}\n\nAssistant:`,
-    parameters: {
-      max_new_tokens: 1000,
-      temperature: 0.7,
-      return_full_text: false,
-    }
-  };
-}
-
-/**
- * Call OpenAI API
+ * Call OpenAI API for company enhancement
  */
 async function callOpenAI(
   messages: LLMMessage[], 
   model: string, 
   apiKey: string,
-  temperature: number = 0.7,
-  maxTokens: number = 1000
+  temperature: number = 0.3,
+  maxTokens: number = 2000
 ): Promise<LLMResponse> {
   const config = LLM_CONFIGS.openai;
   
   const payload = {
     model,
-    messages: formatOpenAIMessages(messages),
+    messages: [
+      { role: 'system', content: ENHANCEMENT_PROMPT },
+      ...messages.map(msg => ({
+        role: msg.role === 'assistant' ? 'assistant' : 'user',
+        content: msg.content,
+      }))
+    ],
     temperature,
     max_tokens: maxTokens,
     stream: false,
@@ -171,22 +108,28 @@ async function callOpenAI(
 }
 
 /**
- * Call Anthropic API
+ * Call Anthropic API for company enhancement
  */
 async function callAnthropic(
   messages: LLMMessage[], 
   model: string, 
   apiKey: string,
-  temperature: number = 0.7,
-  maxTokens: number = 1000
+  temperature: number = 0.3,
+  maxTokens: number = 2000
 ): Promise<LLMResponse> {
   const config = LLM_CONFIGS.anthropic;
+  
+  const userMessages = messages.filter(msg => msg.role !== 'system');
   
   const payload = {
     model,
     max_tokens: maxTokens,
     temperature,
-    ...formatAnthropicMessages(messages),
+    system: ENHANCEMENT_PROMPT,
+    messages: userMessages.map(msg => ({
+      role: msg.role === 'assistant' ? 'assistant' : 'user',
+      content: msg.content,
+    }))
   };
   
   const response = await fetch(`${config.baseUrl}${config.chatEndpoint}`, {
@@ -215,20 +158,30 @@ async function callAnthropic(
 }
 
 /**
- * Call Hugging Face API
+ * Call Hugging Face API for company enhancement
  */
 async function callHuggingFace(
   messages: LLMMessage[], 
   model: string, 
   apiKey: string,
-  temperature: number = 0.7,
-  maxTokens: number = 1000
+  temperature: number = 0.3,
+  maxTokens: number = 2000
 ): Promise<LLMResponse> {
   const config = LLM_CONFIGS.huggingface;
   
-  const payload = formatHuggingFaceMessages(messages);
-  payload.parameters.temperature = temperature;
-  payload.parameters.max_new_tokens = maxTokens;
+  const conversationText = messages.map(msg => {
+    const prefix = msg.role === 'user' ? 'Human: ' : 'Assistant: ';
+    return prefix + msg.content;
+  }).join('\n\n');
+  
+  const payload = {
+    inputs: `${ENHANCEMENT_PROMPT}\n\n${conversationText}\n\nAssistant:`,
+    parameters: {
+      max_new_tokens: maxTokens,
+      temperature: temperature,
+      return_full_text: false,
+    }
+  };
   
   const response = await fetch(`${config.baseUrl}/${model}`, {
     method: 'POST',
@@ -246,7 +199,7 @@ async function callHuggingFace(
   return {
     content: Array.isArray(data) ? data[0].generated_text : data.generated_text,
     usage: {
-      prompt_tokens: 0, // HF doesn't provide token counts
+      prompt_tokens: 0,
       completion_tokens: 0,
       total_tokens: 0,
     },
@@ -256,28 +209,40 @@ async function callHuggingFace(
 }
 
 /**
- * Main chat API handler
+ * Parse LLM response to extract JSON
+ */
+function parseEnhancementResponse(content: string): any {
+  try {
+    // Try to extract JSON from the response
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+    
+    // If no JSON found, try parsing the entire content
+    return JSON.parse(content);
+  } catch (error) {
+    console.error('Failed to parse LLM response as JSON:', error);
+    throw new Error('Invalid response format from AI service');
+  }
+}
+
+/**
+ * Main company enhancement API handler
  */
 export async function POST(req: NextRequest) {
-  // Check rate limit
-  if (!checkRateLimit(req)) {
-    return NextResponse.json({ 
-      error: 'Rate limit exceeded. Please try again later.' 
-    }, { status: 429 });
-  }
-  
   try {
-    const { model, messages, context } = await req.json();
+    const { companyName, website, llmConfig } = await req.json();
     
     // Validate input
-    if (!model || !messages || !Array.isArray(messages)) {
+    if (!companyName || !llmConfig) {
       return NextResponse.json({ 
-        error: 'Invalid request. Model and messages are required.' 
+        error: 'Company name and LLM configuration are required.' 
       }, { status: 400 });
     }
     
     // Parse provider and model
-    const [provider, modelName] = model.split(':');
+    const [provider, modelName] = llmConfig.model.split(':');
     
     if (!provider || !modelName) {
       return NextResponse.json({ 
@@ -292,9 +257,9 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
     
-    // Get API key from headers, context, or server environment
+    // Get API key
     let apiKey = req.headers.get('authorization')?.replace('Bearer ', '') || 
-                 context?.apiKey;
+                 llmConfig.apiKey;
     
     // If API key is "server-configured", use environment variable
     if (apiKey === 'server-configured') {
@@ -307,13 +272,17 @@ export async function POST(req: NextRequest) {
       }, { status: 401 });
     }
     
-    // Test mode for validation
-    if (context?.test) {
-      return NextResponse.json({ 
-        success: true, 
-        message: 'API key validation successful' 
-      }, { status: 200 });
-    }
+    // Create the enhancement request
+    const enhancementRequest = `Please analyze and enhance the profile for the following company:
+
+Company Name: ${companyName}
+Website: ${website || 'Not provided'}
+
+Please provide a comprehensive business profile based on this information.`;
+
+    const messages: LLMMessage[] = [
+      { role: 'user', content: enhancementRequest }
+    ];
     
     // Call appropriate LLM provider
     let response: LLMResponse;
@@ -324,8 +293,8 @@ export async function POST(req: NextRequest) {
           messages, 
           modelName, 
           apiKey, 
-          context?.temperature, 
-          context?.maxTokens
+          llmConfig.temperature || 0.3, 
+          llmConfig.maxTokens || 2000
         );
         break;
         
@@ -334,8 +303,8 @@ export async function POST(req: NextRequest) {
           messages, 
           modelName, 
           apiKey, 
-          context?.temperature, 
-          context?.maxTokens
+          llmConfig.temperature || 0.3, 
+          llmConfig.maxTokens || 2000
         );
         break;
         
@@ -344,8 +313,8 @@ export async function POST(req: NextRequest) {
           messages, 
           modelName, 
           apiKey, 
-          context?.temperature, 
-          context?.maxTokens
+          llmConfig.temperature || 0.3, 
+          llmConfig.maxTokens || 2000
         );
         break;
         
@@ -353,15 +322,22 @@ export async function POST(req: NextRequest) {
         throw new Error(`Unsupported provider: ${provider}`);
     }
     
+    // Parse the response
+    const enhancementData = parseEnhancementResponse(response.content);
+    
+    // Add timestamp
+    enhancementData.lastEnhanced = Date.now();
+    
     // Return response
     return NextResponse.json({
       success: true,
-      data: response,
+      data: enhancementData,
+      usage: response.usage,
       timestamp: Date.now(),
     }, { status: 200 });
     
   } catch (error) {
-    console.error('Chat API error:', error);
+    console.error('Company enhancement API error:', error);
     
     // Return appropriate error response
     if (error instanceof Error) {
@@ -376,6 +352,4 @@ export async function POST(req: NextRequest) {
       }, { status: 500 });
     }
   }
-}
-
-// Rate limit configuration for internal use only
+} 

@@ -62,100 +62,109 @@ async function searchSAMEntities(
   
   // Use cache wrapper
   return withCache(cacheKey, async () => {
-  const params = new URLSearchParams();
-  
-  // Add search parameters
-  if (filters.entityName) {
-    params.append('entityName', filters.entityName);
-  }
-  
-  if (filters.ueiSAM) {
-    params.append('ueiSAM', filters.ueiSAM);
-  }
-  
-  if (filters.cageCode) {
-    params.append('cageCode', filters.cageCode);
-  }
-  
-  if (filters.duns) {
-    params.append('duns', filters.duns);
-  }
-  
-  if (filters.state) {
-    params.append('state', filters.state);
-  }
-  
-  if (filters.city) {
-    params.append('city', filters.city);
-  }
-  
-  if (filters.zipCode) {
-    params.append('zipCode', filters.zipCode);
-  }
-  
-  params.append('limit', Math.min(filters.limit || 50, 100).toString());
-  params.append('offset', (filters.offset || 0).toString());
-  
-  // Add default parameters
-  params.append('includeCount', 'true');
-  params.append('format', 'json');
-  
-  const url = `${SAM_BASE_URL}${SAM_ENTITY_ENDPOINT}?${params.toString()}`;
-  
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'X-API-Key': samApiKey,
-      'Accept': 'application/json',
-    },
-  });
-  
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`SAM.gov Entity API error: ${response.status} ${response.statusText} - ${error}`);
-  }
-  
-  const data = await response.json();
-  
-  // Transform SAM.gov response to our format
-  return data.entityData?.map((entity: any) => ({
-    ueiSAM: entity.ueiSAM,
-    entityName: entity.entityName,
-    cageCode: entity.cageCode,
-    duns: entity.duns,
-    entityStructure: entity.entityStructure,
-    businessTypes: entity.businessTypes,
-    registrationStatus: entity.registrationStatus,
-    registrationDate: entity.registrationDate,
-    lastUpdated: entity.lastUpdated,
-    expirationDate: entity.expirationDate,
-    address: entity.address,
-    pointOfContact: entity.pointOfContact,
-    samStatus: entity.samStatus,
-    exclusionStatus: entity.exclusionStatus,
-    hasDelinquentFederalDebt: entity.hasDelinquentFederalDebt,
-    hasExclusions: entity.hasExclusions,
-    hasSuspensions: entity.hasSuspensions,
-    hasDebarments: entity.hasDebarments,
-    hasIneligibilities: entity.hasIneligibilities,
-    hasAdministrativeAgreements: entity.hasAdministrativeAgreements,
-    hasSettlementAgreements: entity.hasSettlementAgreements,
-    hasVoluntaryExclusions: entity.hasVoluntaryExclusions,
-    hasProtests: entity.hasProtests,
-    hasDisputes: entity.hasDisputes,
-    hasAppeals: entity.hasAppeals,
-    hasLitigation: entity.hasLitigation,
-    hasBankruptcy: entity.hasBankruptcy,
-    hasTaxDelinquencies: entity.hasTaxDelinquencies,
-    hasEnvironmentalViolations: entity.hasEnvironmentalViolations,
-    hasLaborViolations: entity.hasLaborViolations,
-    hasSafetyViolations: entity.hasSafetyViolations,
-    hasQualityViolations: entity.hasQualityViolations,
-    hasPerformanceIssues: entity.hasPerformanceIssues,
-    hasFinancialIssues: entity.hasFinancialIssues,
-    hasComplianceIssues: entity.hasComplianceIssues,
-    hasOtherIssues: entity.hasOtherIssues,
-  })) || [];
+    // --- SAM.gov API CALL HAPPENS HERE ---
+    let url: string;
+    let isSingleEntity = false;
+    let params = new URLSearchParams();
+
+    if (filters.ueiSAM) {
+      // Use the direct UEI SAM parameter as specified
+      params.append('ueiSAM', filters.ueiSAM);
+      params.append('api_key', samApiKey);
+      url = `${SAM_BASE_URL}${SAM_ENTITY_ENDPOINT}?${params.toString()}`;
+      isSingleEntity = true;
+      console.log('🔍 Using SINGLE entity endpoint:', url);
+    } else {
+      // Use the bulk endpoint
+      if (filters.entityName) params.append('entityName', filters.entityName);
+      if (filters.cageCode) params.append('cageCode', filters.cageCode);
+      if (filters.duns) params.append('duns', filters.duns);
+      if (filters.state) params.append('state', filters.state);
+      if (filters.city) params.append('city', filters.city);
+      if (filters.zipCode) params.append('zipCode', filters.zipCode);
+      params.append('size', Math.min(filters.limit || 50, 100).toString());
+      params.append('registrationStatus', 'ACTIVE');
+      params.append('format', 'json');
+      url = `${SAM_BASE_URL}${SAM_ENTITY_ENDPOINT}?${params.toString()}`;
+      console.log('🔍 Using BULK endpoint:', url);
+    }
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+
+    // Check response status
+    if (!response.ok) {
+      if (response.status === 404 && isSingleEntity) {
+        throw new Error(`Entity with UEI SAM ${filters.ueiSAM} not found. Please verify the UEI SAM number is correct.`);
+      } else if (response.status === 401) {
+        throw new Error('Invalid SAM.gov API key. Please check your API key and try again.');
+      } else if (response.status === 429) {
+        throw new Error('Rate limit exceeded. Please wait a moment and try again.');
+      } else {
+        throw new Error(`SAM.gov API error: ${response.status} ${response.statusText}`);
+      }
+    }
+
+    // Always read the response as text first
+    const rawText = await response.text();
+    
+    // Check if this is a download response (only for bulk searches)
+    if (!isSingleEntity && rawText.includes('Extract File will be available for download')) {
+      console.log('SAM.gov Entity API requires bulk download approach');
+      throw new Error('SAM.gov Entity API requires bulk download. Individual entity lookups are not supported in real-time. Use the bulk download endpoint instead.');
+    }
+    
+    let data;
+    try {
+      data = JSON.parse(rawText);
+    } catch (parseError) {
+      console.error('Failed to parse SAM.gov response as JSON:', {
+        status: response.status,
+        statusText: response.statusText,
+        url,
+        params: Object.fromEntries(params.entries()),
+        rawResponse: rawText.substring(0, 500)
+      });
+      
+      if (isSingleEntity) {
+        throw new Error(`Failed to fetch entity with UEI SAM ${filters.ueiSAM}. Please verify the UEI SAM number is correct and try again.`);
+      } else {
+        throw new Error(`SAM.gov API returned invalid JSON: ${rawText.substring(0, 200)}...`);
+      }
+    }
+
+    // --- END SAM.gov API CALL ---
+
+    // Transform SAM.gov response to our format
+    if (isSingleEntity) {
+      // Single entity lookup - handle different response formats
+      if (data && data.entityData && Array.isArray(data.entityData)) {
+        // Standard SAM.gov response format with entityData array
+        return data.entityData;
+      } else if (data && data.entity) {
+        return [data.entity];
+      } else if (data && data.ueiSAM) {
+        // Direct entity response
+        return [data];
+      } else if (Array.isArray(data) && data.length > 0) {
+        // Array response with single entity
+        return data;
+      } else if (data && data.entities && Array.isArray(data.entities)) {
+        // Response with entities array
+        return data.entities;
+      } else {
+        console.log('No entity found in response:', data);
+        return [];
+      }
+    } else {
+      // Bulk search: entityData is an array
+      const entities = Array.isArray(data) ? data : (data.entityData || []);
+      return entities;
+    }
   }, { prefix: 'sam-entity', ttl: 3600 }); // Cache for 1 hour
 }
 
@@ -239,4 +248,4 @@ export async function GET(req: NextRequest) {
   }
 }
 
-export { SAM_RATE_LIMIT_WINDOW, SAM_RATE_LIMIT_MAX_REQUESTS }; 
+// Rate limit configuration for internal use only 

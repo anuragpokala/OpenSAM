@@ -8,7 +8,6 @@ import {
   ChatMessage, 
   SAMOpportunity, 
   SAMSearchFilters, 
-  UploadedFile,
   WorkingList,
   WorkingListItem,
   VectorSearchResult,
@@ -87,9 +86,7 @@ const initialState: AppState = {
   workingListItems: [],
   isWorkingListLoading: false,
   
-  uploadedFiles: [],
-  isUploading: false,
-  uploadProgress: 0,
+
   companyProfile: null,
   isCompanyProfileLoading: false,
   sidebarOpen: true,
@@ -102,6 +99,14 @@ const initialState: AppState = {
     notifications: true,
     analytics: false,
   },
+  
+  // Cache State
+  lastSearchCached: false,
+  lastSearchTimestamp: null,
+  cacheNotificationDismissed: false,
+  
+  // Chat Prepopulated Message State
+  prepopulatedMessage: null,
 };
 
 // Store interface with actions
@@ -122,6 +127,7 @@ interface AppStore extends AppState {
   updateMessageInSession: (sessionId: string, messageId: string, updates: Partial<ChatMessage>) => void;
   clearAllSessions: () => void;
   setIsStreaming: (isStreaming: boolean) => void;
+  setPrepopulatedMessage: (message: string | null) => void;
   
   // Search Actions
   setSearchQuery: (query: string) => void;
@@ -151,13 +157,7 @@ interface AppStore extends AppState {
   updateWorkingListItem: (itemId: string, updates: Partial<WorkingListItem>) => Promise<void>;
   removeItemFromWorkingList: (listId: string, itemId: string) => Promise<void>;
   
-  // Upload Actions
-  addUploadedFile: (file: UploadedFile) => void;
-  updateUploadedFile: (fileId: string, updates: Partial<UploadedFile>) => void;
-  removeUploadedFile: (fileId: string) => void;
-  setIsUploading: (isUploading: boolean) => void;
-  setUploadProgress: (progress: number) => void;
-  clearAllUploads: () => void;
+
   
   // Company Profile Actions
   setCompanyProfile: (profile: CompanyProfile | null) => void;
@@ -165,16 +165,21 @@ interface AppStore extends AppState {
   setIsCompanyProfileLoading: (loading: boolean) => void;
   fetchSAMEntityData: (ueiSAM: string) => Promise<SAMEntityData | null>;
   saveCompanyProfile: (profile: CompanyProfile) => Promise<void>;
+  enhanceCompanyProfile: (companyName: string, website?: string) => Promise<any>;
   
   // UI Actions
   setSidebarOpen: (open: boolean) => void;
-  setCurrentView: (view: 'chat' | 'search' | 'forecast' | 'upload') => void;
+  setCurrentView: (view: 'chat' | 'search' | 'forecast' | 'upload' | 'vectorstore') => void;
   setTheme: (theme: 'light' | 'dark') => void;
   
   // Settings Actions
   setSamApiKey: (apiKey: string) => void;
   setEncryptionKey: (key: string) => void;
   updateSettings: (settings: Partial<AppState['settings']>) => void;
+  
+  // Cache Actions
+  setLastSearchCached: (cached: boolean, timestamp?: number) => void;
+  dismissCacheNotification: () => void;
   
   // Utility Actions
   resetStore: () => void;
@@ -329,6 +334,9 @@ export const useAppStore = create<AppStore>()(
       
       setIsStreaming: (isStreaming) => 
         set({ isStreaming }),
+      
+      setPrepopulatedMessage: (message) => 
+        set({ prepopulatedMessage: message }),
       
       // Search Actions
       setSearchQuery: (query) => 
@@ -541,32 +549,7 @@ export const useAppStore = create<AppStore>()(
         }
       },
       
-      // Upload Actions
-      addUploadedFile: (file) => 
-        set((state) => ({
-          uploadedFiles: [...state.uploadedFiles, file],
-        })),
       
-      updateUploadedFile: (fileId, updates) => 
-        set((state) => ({
-          uploadedFiles: state.uploadedFiles.map(file =>
-            file.id === fileId ? { ...file, ...updates } : file
-          ),
-        })),
-      
-      removeUploadedFile: (fileId) => 
-        set((state) => ({
-          uploadedFiles: state.uploadedFiles.filter(f => f.id !== fileId),
-        })),
-      
-      setIsUploading: (isUploading) => 
-        set({ isUploading }),
-      
-      setUploadProgress: (progress) => 
-        set({ uploadProgress: progress }),
-      
-      clearAllUploads: () => 
-        set({ uploadedFiles: [] }),
       
       // Company Profile Actions
       setCompanyProfile: (profile) => 
@@ -616,8 +599,57 @@ export const useAppStore = create<AppStore>()(
           
           // Update store
           set({ companyProfile: profile });
+          
+          // Add to vector store for matching
+          try {
+            const { vectorStoreUtils } = await import('@/lib/vectorStore');
+            await vectorStoreUtils.addCompanyProfile(profile);
+            console.log('✅ Company profile added to vector store');
+          } catch (vectorError) {
+            console.warn('⚠️ Failed to add company profile to vector store:', vectorError);
+            // Don't fail the save operation if vector store is unavailable
+          }
         } catch (error) {
           console.error('Failed to save company profile:', error);
+          throw error;
+        }
+      },
+      
+      enhanceCompanyProfile: async (companyName, website) => {
+        try {
+          const { llmConfig } = get();
+          
+          if (!llmConfig.apiKey || !llmConfig.model) {
+            throw new Error('LLM configuration is required for company enhancement');
+          }
+          
+          const response = await fetch('/api/company-enhance', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${llmConfig.apiKey}`
+            },
+            body: JSON.stringify({
+              companyName,
+              website,
+              llmConfig: {
+                model: `${llmConfig.provider}:${llmConfig.model}`,
+                apiKey: llmConfig.apiKey,
+                temperature: llmConfig.temperature || 0.3,
+                maxTokens: llmConfig.maxTokens || 2000
+              }
+            })
+          });
+          
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to enhance company profile');
+          }
+          
+          const data = await response.json();
+          return data.data;
+        } catch (error) {
+          console.error('Failed to enhance company profile:', error);
           throw error;
         }
       },
@@ -647,6 +679,13 @@ export const useAppStore = create<AppStore>()(
           settings: { ...state.settings, ...settings },
         })),
       
+      // Cache Actions
+      setLastSearchCached: (cached, timestamp) => 
+        set({ lastSearchCached: cached, lastSearchTimestamp: timestamp }),
+      
+      dismissCacheNotification: () => 
+        set({ cacheNotificationDismissed: true }),
+      
       // Utility Actions
       resetStore: () => 
         set(initialState),
@@ -655,7 +694,6 @@ export const useAppStore = create<AppStore>()(
         const state = get();
         const exportData = {
           chatSessions: state.chatSessions,
-          uploadedFiles: state.uploadedFiles,
           favorites: state.favorites,
           settings: state.settings,
           searchFilters: state.searchFilters,
@@ -731,10 +769,7 @@ export const useAppStore = create<AppStore>()(
         chatSessions: state.chatSessions,
         favorites: state.favorites,
         searchFilters: state.searchFilters,
-        uploadedFiles: state.uploadedFiles.map(file => ({
-          ...file,
-          content: '', // Don't persist file content
-        })),
+
         settings: state.settings,
         theme: state.theme,
         currentView: state.currentView,
@@ -750,7 +785,7 @@ export const useChatSessions = () => useAppStore((state) => state.chatSessions);
 export const useLLMConfig = () => useAppStore((state) => state.llmConfig);
 export const useSearchResults = () => useAppStore((state) => state.searchResults);
 export const useSearchFilters = () => useAppStore((state) => state.searchFilters);
-export const useUploadedFiles = () => useAppStore((state) => state.uploadedFiles);
+
 export const useUIState = () => useAppStore((state) => ({
   sidebarOpen: state.sidebarOpen,
   currentView: state.currentView,

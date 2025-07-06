@@ -15,22 +15,19 @@ import {
   Star,
   Filter,
   Download,
-  RefreshCw
+  RefreshCw,
+  Database
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
+
 import { useAppStore, useUIState, useLLMConfig, useCompanyProfile, useIsCompanyProfileLoading } from '@/stores/appStore';
 import { cn, generateId } from '@/lib/utils';
 import SearchView from '@/components/SearchView';
 import CacheStatus from '@/components/CacheStatus';
+import { MarkdownRenderer } from '@/components/ui/markdown-renderer';
 import { CompanyProfile } from '@/types';
 
 // Navigation items
@@ -39,6 +36,7 @@ const navigationItems = [
   { id: 'search', label: 'Search', icon: Search },
   { id: 'forecast', label: 'Forecast', icon: TrendingUp },
   { id: 'upload', label: 'AI Company Profile', icon: Upload },
+  { id: 'vectorstore', label: 'Vector Store', icon: Database },
 ];
 
 // Main Dashboard Component
@@ -112,11 +110,11 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Sidebar */}
-      <div className={cn(
-        "fixed inset-y-0 left-0 z-50 w-64 bg-opensam-white border-r border-opensam-gray-200 transform transition-transform duration-300 ease-in-out",
-        sidebarOpen ? "translate-x-0" : "-translate-x-full"
-      )}>
+              {/* Sidebar */}
+        <div className={cn(
+          "fixed inset-y-0 left-0 z-50 w-64 bg-background border-r border-border transform transition-transform duration-300 ease-in-out",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        )}>
         <div className="flex flex-col h-full">
           {/* Sidebar Header */}
           <div className="flex items-center justify-between p-4 border-b border-opensam-gray-200">
@@ -158,19 +156,29 @@ export default function Dashboard() {
               <label className="text-sm font-medium text-opensam-gray-700">
                 LLM Provider
               </label>
-              <Select
-                value={llmConfig.provider}
-                onValueChange={(value) => setLLMProvider(value as any)}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select provider" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="openai">OpenAI</SelectItem>
-                  <SelectItem value="anthropic">Anthropic</SelectItem>
-                  <SelectItem value="huggingface">Hugging Face</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex space-x-2">
+                <Button
+                  variant={llmConfig.provider === 'openai' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setLLMProvider('openai')}
+                >
+                  OpenAI
+                </Button>
+                <Button
+                  variant={llmConfig.provider === 'anthropic' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setLLMProvider('anthropic')}
+                >
+                  Anthropic
+                </Button>
+                <Button
+                  variant={llmConfig.provider === 'huggingface' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setLLMProvider('huggingface')}
+                >
+                  Hugging Face
+                </Button>
+              </div>
               
               <Button
                 variant="outline"
@@ -192,7 +200,7 @@ export default function Dashboard() {
         sidebarOpen ? "lg:ml-64" : "ml-0"
       )}>
         {/* Header */}
-        <header className="bg-opensam-white border-b border-opensam-gray-200 px-4 py-3 flex items-center justify-between">
+        <header className="bg-background border-b border-border px-4 py-3 flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <Button
               variant="ghost"
@@ -216,6 +224,7 @@ export default function Dashboard() {
                 {llmConfig.apiKey ? `${llmConfig.provider} connected` : 'No API key'}
               </span>
             </div>
+            <ThemeToggle />
             <Button
               variant="ghost"
               size="icon"
@@ -232,29 +241,43 @@ export default function Dashboard() {
           {currentView === 'search' && <SearchView />}
           {currentView === 'forecast' && <ForecastView />}
           {currentView === 'upload' && <UploadView />}
+          {currentView === 'vectorstore' && <VectorStoreView />}
         </main>
       </div>
 
       {/* API Key Dialog */}
       {apiKeyDialogOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-opensam-white rounded-lg p-6 w-full max-w-md mx-4">
+          <div className="bg-background rounded-lg p-6 w-full max-w-md mx-4">
             <h3 className="text-lg font-semibold mb-4">Configure API Key</h3>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-opensam-gray-700 mb-1">
                   Provider
                 </label>
-                <Select value={llmConfig.provider} onValueChange={(value) => setLLMProvider(value as any)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="openai">OpenAI</SelectItem>
-                    <SelectItem value="anthropic">Anthropic</SelectItem>
-                    <SelectItem value="huggingface">Hugging Face</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex space-x-2">
+                  <Button
+                    variant={llmConfig.provider === 'openai' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setLLMProvider('openai')}
+                  >
+                    OpenAI
+                  </Button>
+                  <Button
+                    variant={llmConfig.provider === 'anthropic' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setLLMProvider('anthropic')}
+                  >
+                    Anthropic
+                  </Button>
+                  <Button
+                    variant={llmConfig.provider === 'huggingface' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setLLMProvider('huggingface')}
+                  >
+                    Hugging Face
+                  </Button>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-opensam-gray-700 mb-1">
@@ -296,7 +319,7 @@ export default function Dashboard() {
       {/* Settings Panel */}
       {showSettings && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-opensam-white rounded-lg p-6 w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-background rounded-lg p-6 w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold">Settings</h3>
               <Button
@@ -322,48 +345,98 @@ export default function Dashboard() {
                     <label className="block text-sm font-medium text-opensam-gray-700 mb-1">
                       Provider
                     </label>
-                    <Select value={llmConfig.provider} onValueChange={(value) => setLLMProvider(value as any)}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="openai">OpenAI</SelectItem>
-                        <SelectItem value="anthropic">Anthropic</SelectItem>
-                        <SelectItem value="huggingface">Hugging Face</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="flex space-x-2">
+                      <Button
+                        variant={llmConfig.provider === 'openai' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setLLMProvider('openai')}
+                      >
+                        OpenAI
+                      </Button>
+                      <Button
+                        variant={llmConfig.provider === 'anthropic' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setLLMProvider('anthropic')}
+                      >
+                        Anthropic
+                      </Button>
+                      <Button
+                        variant={llmConfig.provider === 'huggingface' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setLLMProvider('huggingface')}
+                      >
+                        Hugging Face
+                      </Button>
+                    </div>
                   </div>
                   
                   <div>
                     <label className="block text-sm font-medium text-opensam-gray-700 mb-1">
                       Model
                     </label>
-                    <Select value={llmConfig.model} onValueChange={(value) => setLLMModel(value as any)}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {llmConfig.provider === 'openai' && (
-                          <>
-                            <SelectItem value="gpt-4">GPT-4</SelectItem>
-                            <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
-                          </>
-                        )}
-                        {llmConfig.provider === 'anthropic' && (
-                          <>
-                            <SelectItem value="claude-3-opus">Claude 3 Opus</SelectItem>
-                            <SelectItem value="claude-3-sonnet">Claude 3 Sonnet</SelectItem>
-                            <SelectItem value="claude-3-haiku">Claude 3 Haiku</SelectItem>
-                          </>
-                        )}
-                        {llmConfig.provider === 'huggingface' && (
-                          <>
-                            <SelectItem value="meta-llama/Llama-2-70b-chat-hf">Llama 2 70B</SelectItem>
-                            <SelectItem value="microsoft/DialoGPT-medium">DialoGPT Medium</SelectItem>
-                          </>
-                        )}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex flex-wrap gap-2">
+                      {llmConfig.provider === 'openai' && (
+                        <>
+                          <Button
+                            variant={llmConfig.model === 'gpt-4' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setLLMModel('gpt-4')}
+                          >
+                            GPT-4
+                          </Button>
+                          <Button
+                            variant={llmConfig.model === 'gpt-3.5-turbo' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setLLMModel('gpt-3.5-turbo')}
+                          >
+                            GPT-3.5 Turbo
+                          </Button>
+                        </>
+                      )}
+                      {llmConfig.provider === 'anthropic' && (
+                        <>
+                          <Button
+                            variant={llmConfig.model === 'claude-3-opus' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setLLMModel('claude-3-opus')}
+                          >
+                            Claude 3 Opus
+                          </Button>
+                          <Button
+                            variant={llmConfig.model === 'claude-3-sonnet' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setLLMModel('claude-3-sonnet')}
+                          >
+                            Claude 3 Sonnet
+                          </Button>
+                          <Button
+                            variant={llmConfig.model === 'claude-3-haiku' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setLLMModel('claude-3-haiku')}
+                          >
+                            Claude 3 Haiku
+                          </Button>
+                        </>
+                      )}
+                      {llmConfig.provider === 'huggingface' && (
+                        <>
+                          <Button
+                            variant={llmConfig.model === 'meta-llama/Llama-2-70b-chat-hf' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setLLMModel('meta-llama/Llama-2-70b-chat-hf')}
+                          >
+                            Llama 2 70B
+                          </Button>
+                          <Button
+                            variant={llmConfig.model === 'microsoft/DialoGPT-medium' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setLLMModel('microsoft/DialoGPT-medium')}
+                          >
+                            DialoGPT Medium
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </div>
                   
                   <Button
@@ -393,6 +466,16 @@ function ChatView() {
   const [messages, setMessages] = useState<Array<{role: 'user' | 'assistant', content: string}>>([]);
   const [isLoading, setIsLoading] = useState(false);
   const llmConfig = useLLMConfig();
+  const prepopulatedMessage = useAppStore((state) => state.prepopulatedMessage);
+  const setPrepopulatedMessage = useAppStore((state) => state.setPrepopulatedMessage);
+
+  // Handle prepopulated message
+  useEffect(() => {
+    if (prepopulatedMessage) {
+      setInputMessage(prepopulatedMessage);
+      setPrepopulatedMessage(null); // Clear the prepopulated message
+    }
+  }, [prepopulatedMessage, setPrepopulatedMessage]);
 
   const sendMessage = async () => {
     if (!inputMessage.trim() || !llmConfig.apiKey) return;
@@ -485,7 +568,13 @@ function ChatView() {
                           ? 'bg-opensam-black text-opensam-white' 
                           : 'bg-opensam-gray-200 text-opensam-black'
                       }`}>
-                        <p className="text-sm">{message.content}</p>
+                        {message.role === 'user' ? (
+                          <p className="text-sm">{message.content}</p>
+                        ) : (
+                          <div className="text-sm">
+                            <MarkdownRenderer content={message.content} />
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -605,6 +694,7 @@ function UploadView() {
     email: '',
     website: ''
   });
+  const [isEnhancing, setIsEnhancing] = useState(false);
   
   const companyProfile = useCompanyProfile();
   const isCompanyProfileLoading = useIsCompanyProfileLoading();
@@ -613,7 +703,8 @@ function UploadView() {
     updateCompanyProfile, 
     setIsCompanyProfileLoading, 
     fetchSAMEntityData, 
-    saveCompanyProfile 
+    saveCompanyProfile,
+    enhanceCompanyProfile
   } = useAppStore();
 
   // Load existing profile on mount
@@ -640,37 +731,46 @@ function UploadView() {
     try {
       const samData = await fetchSAMEntityData(ueiSAM);
       if (samData) {
+        // Extract data from SAM.gov response structure
+        const entityRegistration = samData.entityRegistration || {};
+        const coreData = samData.coreData || {};
+        const physicalAddress = coreData.physicalAddress || {};
+        const governmentBusinessPOC = samData.pointsOfContact?.governmentBusinessPOC || {};
+        const businessTypes = coreData.businessTypes?.businessTypeList?.map((bt: any) => bt.businessTypeDesc) || [];
+        const naicsCodes = samData.assertions?.goodsAndServices?.naicsList?.map((naics: any) => naics.naicsCode) || [];
+        
         // Update form with SAM data
         setContactInfo({
-          address: samData.address?.line1 || '',
-          city: samData.address?.city || '',
-          state: samData.address?.state || '',
-          zipCode: samData.address?.zipCode || '',
-          phone: samData.pointOfContact?.phone || '',
-          email: samData.pointOfContact?.email || '',
-          website: contactInfo.website || ''
+          address: physicalAddress.addressLine1 || '',
+          city: physicalAddress.city || '',
+          state: physicalAddress.stateOrProvinceCode || '',
+          zipCode: physicalAddress.zipCode || '',
+          phone: '', // SAM.gov doesn't provide phone in POC data
+          email: '', // SAM.gov doesn't provide email in POC data
+          website: contactInfo.website || coreData.entityInformation?.entityURL || ''
         });
-        setBusinessTypes(samData.businessTypes || []);
+        setBusinessTypes(businessTypes);
+        setNaicsCodes(naicsCodes);
         
         // Update company profile with SAM data
         const updatedProfile: CompanyProfile = {
           id: companyProfile?.id || generateId(),
           ueiSAM,
-          entityName: samData.entityName,
-          description: description || `Company profile for ${samData.entityName}`,
-          businessTypes: samData.businessTypes || [],
+          entityName: entityRegistration.legalBusinessName || 'Unknown Company',
+          description: description || `Company profile for ${entityRegistration.legalBusinessName || 'Unknown Company'}`,
+          businessTypes: businessTypes,
           naicsCodes: naicsCodes,
           capabilities: capabilities,
           pastPerformance: pastPerformance,
           certifications: certifications,
           contactInfo: {
-            address: samData.address?.line1 || '',
-            city: samData.address?.city || '',
-            state: samData.address?.state || '',
-            zipCode: samData.address?.zipCode || '',
-            phone: samData.pointOfContact?.phone || '',
-            email: samData.pointOfContact?.email || '',
-            website: contactInfo.website || ''
+            address: physicalAddress.addressLine1 || '',
+            city: physicalAddress.city || '',
+            state: physicalAddress.stateOrProvinceCode || '',
+            zipCode: physicalAddress.zipCode || '',
+            phone: '', // SAM.gov doesn't provide phone in POC data
+            email: '', // SAM.gov doesn't provide email in POC data
+            website: contactInfo.website || coreData.entityInformation?.entityURL || ''
           },
           samEntityData: samData,
           createdAt: companyProfile?.createdAt || Date.now(),
@@ -726,6 +826,43 @@ function UploadView() {
     }
   };
 
+  const handleEnhanceProfile = async () => {
+    const companyName = companyProfile?.entityName || '';
+    const website = contactInfo.website || '';
+    
+    if (!companyName.trim()) {
+      alert('Please fetch SAM data or enter a company name first');
+      return;
+    }
+
+    setIsEnhancing(true);
+    try {
+      const enhancedData = await enhanceCompanyProfile(companyName, website);
+      
+      // Update the profile with enhanced data
+      const updatedProfile: CompanyProfile = {
+        ...companyProfile!,
+        description: enhancedData.enhancedDescription || description,
+        aiEnhanced: enhancedData,
+        updatedAt: Date.now()
+      };
+      
+      await saveCompanyProfile(updatedProfile);
+      
+      // Update form fields with enhanced data
+      setDescription(enhancedData.enhancedDescription || description);
+      setCapabilities(enhancedData.keyProducts || capabilities);
+      setBusinessTypes(enhancedData.targetMarkets || businessTypes);
+      
+      alert('Company profile enhanced successfully with AI!');
+    } catch (error) {
+      console.error('Error enhancing profile:', error);
+      alert(`Failed to enhance company profile: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsEnhancing(false);
+    }
+  };
+
   const addArrayItem = (array: string[], setter: (items: string[]) => void, placeholder: string) => {
     const item = prompt(`Enter ${placeholder}:`);
     if (item && item.trim()) {
@@ -753,10 +890,10 @@ function UploadView() {
           <div className="space-y-6">
             {/* UEI SAM Section */}
             <div className="space-y-4">
-              <h3 className="text-lg font-medium text-opensam-black">Company Identification</h3>
+              <h3 className="text-lg font-medium text-foreground">Company Identification</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium text-opensam-gray-700">UEI SAM Number *</label>
+                  <label className="text-sm font-medium text-foreground">UEI SAM Number *</label>
                   <div className="flex space-x-2 mt-1">
                     <Input
                       placeholder="Enter your UEI SAM number"
@@ -771,12 +908,12 @@ function UploadView() {
                       {isCompanyProfileLoading ? 'Fetching...' : 'Fetch SAM Data'}
                     </Button>
                   </div>
-                  <p className="text-xs text-opensam-gray-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     Enter your UEI SAM number to automatically fetch company data from SAM.gov
                   </p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-opensam-gray-700">Company Name</label>
+                  <label className="text-sm font-medium text-foreground">Company Name</label>
                   <Input
                     placeholder="Company name"
                     value={companyProfile?.entityName || ''}
@@ -787,13 +924,84 @@ function UploadView() {
               </div>
             </div>
 
+            {/* AI Enhancement Section */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium text-foreground">AI-Powered Profile Enhancement</h3>
+              <div className="bg-gradient-to-r from-muted/50 to-muted/30 border border-border rounded-lg p-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <h4 className="font-medium text-foreground mb-2">Enhance Your Profile with AI</h4>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Use AI to automatically populate your company profile with detailed information based on your company name and website.
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-medium text-foreground">Company Name</label>
+                        <Input
+                          placeholder="Company name"
+                          value={companyProfile?.entityName || ''}
+                          disabled
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-foreground">Website URL</label>
+                        <Input
+                          placeholder="https://yourcompany.com"
+                          value={contactInfo.website}
+                          onChange={(e) => setContactInfo({...contactInfo, website: e.target.value})}
+                          className="mt-1"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="ml-4">
+                    <Button
+                      onClick={handleEnhanceProfile}
+                      disabled={isEnhancing || !companyProfile?.entityName}
+                      className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground"
+                    >
+                      {isEnhancing ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground mr-2"></div>
+                          Enhancing...
+                        </>
+                      ) : (
+                        <>
+                          <Bot className="h-4 w-4 mr-2" />
+                          Enhance with AI
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+                {companyProfile?.aiEnhanced && (
+                  <div className="mt-4 p-3 bg-card rounded border border-border">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-foreground">AI Enhancement Details</span>
+                      <span className="text-xs text-muted-foreground">
+                        Enhanced {new Date(companyProfile.aiEnhanced.lastEnhanced).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                      <div><span className="font-medium">Industry:</span> {companyProfile.aiEnhanced.industry}</div>
+                      <div><span className="font-medium">Size:</span> {companyProfile.aiEnhanced.companySize}</div>
+                      {companyProfile.aiEnhanced.foundingYear && (
+                        <div><span className="font-medium">Founded:</span> {companyProfile.aiEnhanced.foundingYear}</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Company Description */}
             <div className="space-y-4">
-              <h3 className="text-lg font-medium text-opensam-black">Company Description</h3>
+              <h3 className="text-lg font-medium text-foreground">Company Description</h3>
               <div>
-                <label className="text-sm font-medium text-opensam-gray-700">Description *</label>
+                <label className="text-sm font-medium text-foreground">Description *</label>
                 <textarea
-                  className="w-full mt-1 p-3 border border-opensam-gray-300 rounded-lg resize-none"
+                  className="w-full mt-1 p-3 border border-border rounded-lg resize-none bg-background text-foreground"
                   rows={4}
                   placeholder="Describe what your company does, your expertise, and key capabilities..."
                   value={description}
@@ -804,15 +1012,15 @@ function UploadView() {
 
             {/* Business Information */}
             <div className="space-y-4">
-              <h3 className="text-lg font-medium text-opensam-black">Business Information</h3>
+              <h3 className="text-lg font-medium text-foreground">Business Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Business Types */}
                 <div>
-                  <label className="text-sm font-medium text-opensam-gray-700">Business Types</label>
+                  <label className="text-sm font-medium text-foreground">Business Types</label>
                   <div className="mt-1 space-y-2">
                     {businessTypes.map((type, index) => (
                       <div key={index} className="flex items-center space-x-2">
-                        <span className="text-sm bg-opensam-gray-100 px-2 py-1 rounded">{type}</span>
+                        <span className="text-sm bg-muted px-2 py-1 rounded">{type}</span>
                         <Button
                           size="sm"
                           variant="ghost"
@@ -834,11 +1042,11 @@ function UploadView() {
 
                 {/* NAICS Codes */}
                 <div>
-                  <label className="text-sm font-medium text-opensam-gray-700">NAICS Codes</label>
+                  <label className="text-sm font-medium text-foreground">NAICS Codes</label>
                   <div className="mt-1 space-y-2">
                     {naicsCodes.map((code, index) => (
                       <div key={index} className="flex items-center space-x-2">
-                        <span className="text-sm bg-opensam-gray-100 px-2 py-1 rounded">{code}</span>
+                        <span className="text-sm bg-muted px-2 py-1 rounded">{code}</span>
                         <Button
                           size="sm"
                           variant="ghost"
@@ -862,13 +1070,13 @@ function UploadView() {
 
             {/* Capabilities */}
             <div className="space-y-4">
-              <h3 className="text-lg font-medium text-opensam-black">Capabilities & Expertise</h3>
+              <h3 className="text-lg font-medium text-foreground">Capabilities & Expertise</h3>
               <div>
-                <label className="text-sm font-medium text-opensam-gray-700">Key Capabilities</label>
+                <label className="text-sm font-medium text-foreground">Key Capabilities</label>
                 <div className="mt-1 space-y-2">
                   {capabilities.map((capability, index) => (
                     <div key={index} className="flex items-center space-x-2">
-                      <span className="text-sm bg-blue-100 px-2 py-1 rounded">{capability}</span>
+                      <span className="text-sm bg-blue-500/20 text-blue-700 dark:text-blue-300 px-2 py-1 rounded">{capability}</span>
                       <Button
                         size="sm"
                         variant="ghost"
@@ -889,15 +1097,114 @@ function UploadView() {
               </div>
             </div>
 
+            {/* AI Enhanced Information Display */}
+            {companyProfile?.aiEnhanced && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium text-foreground">AI-Enhanced Company Information</h3>
+                <div className="bg-gradient-to-r from-green-500/10 to-blue-500/10 border border-green-500/20 rounded-lg p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Company Overview */}
+                    <div>
+                      <h4 className="font-medium text-foreground mb-3">Company Overview</h4>
+                      <div className="space-y-2 text-sm">
+                        <div><span className="font-medium">Industry:</span> {companyProfile.aiEnhanced.industry}</div>
+                        <div><span className="font-medium">Company Size:</span> {companyProfile.aiEnhanced.companySize}</div>
+                        {companyProfile.aiEnhanced.foundingYear && (
+                          <div><span className="font-medium">Founded:</span> {companyProfile.aiEnhanced.foundingYear}</div>
+                        )}
+                        {companyProfile.aiEnhanced.revenue && (
+                          <div><span className="font-medium">Revenue:</span> {companyProfile.aiEnhanced.revenue}</div>
+                        )}
+                        {companyProfile.aiEnhanced.employeeCount && (
+                          <div><span className="font-medium">Employees:</span> {companyProfile.aiEnhanced.employeeCount}</div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Key Products & Markets */}
+                    <div>
+                      <h4 className="font-medium text-foreground mb-3">Products & Markets</h4>
+                      <div className="space-y-3">
+                        <div>
+                          <span className="text-sm font-medium text-foreground">Key Products:</span>
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {companyProfile.aiEnhanced.keyProducts.map((product, index) => (
+                              <span key={index} className="text-xs bg-blue-500/20 text-blue-700 dark:text-blue-300 px-2 py-1 rounded">{product}</span>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <span className="text-sm font-medium text-foreground">Target Markets:</span>
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {companyProfile.aiEnhanced.targetMarkets.map((market, index) => (
+                              <span key={index} className="text-xs bg-green-500/20 text-green-700 dark:text-green-300 px-2 py-1 rounded">{market}</span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Competitive Advantages */}
+                  {companyProfile.aiEnhanced.competitiveAdvantages.length > 0 && (
+                    <div className="mt-4">
+                      <h4 className="font-medium text-foreground mb-2">Competitive Advantages</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {companyProfile.aiEnhanced.competitiveAdvantages.map((advantage, index) => (
+                          <span key={index} className="text-sm bg-purple-500/20 text-purple-700 dark:text-purple-300 px-3 py-1 rounded-full">{advantage}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Technology Stack */}
+                  {companyProfile.aiEnhanced.technologyStack && companyProfile.aiEnhanced.technologyStack.length > 0 && (
+                    <div className="mt-4">
+                      <h4 className="font-medium text-foreground mb-2">Technology Stack</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {companyProfile.aiEnhanced.technologyStack.map((tech, index) => (
+                          <span key={index} className="text-sm bg-orange-500/20 text-orange-700 dark:text-orange-300 px-3 py-1 rounded-full">{tech}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Partnerships & Awards */}
+                  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {companyProfile.aiEnhanced.partnerships && companyProfile.aiEnhanced.partnerships.length > 0 && (
+                      <div>
+                        <h4 className="font-medium text-foreground mb-2">Partnerships</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {companyProfile.aiEnhanced.partnerships.map((partner, index) => (
+                            <span key={index} className="text-sm bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 px-3 py-1 rounded-full">{partner}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {companyProfile.aiEnhanced.awards && companyProfile.aiEnhanced.awards.length > 0 && (
+                      <div>
+                        <h4 className="font-medium text-foreground mb-2">Awards & Recognition</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {companyProfile.aiEnhanced.awards.map((award, index) => (
+                            <span key={index} className="text-sm bg-yellow-500/20 text-yellow-700 dark:text-yellow-300 px-3 py-1 rounded-full">{award}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Past Performance */}
             <div className="space-y-4">
-              <h3 className="text-lg font-medium text-opensam-black">Past Performance</h3>
+              <h3 className="text-lg font-medium text-foreground">Past Performance</h3>
               <div>
-                <label className="text-sm font-medium text-opensam-gray-700">Past Performance Projects</label>
+                <label className="text-sm font-medium text-foreground">Past Performance Projects</label>
                 <div className="mt-1 space-y-2">
                   {pastPerformance.map((project, index) => (
                     <div key={index} className="flex items-center space-x-2">
-                      <span className="text-sm bg-green-100 px-2 py-1 rounded">{project}</span>
+                      <span className="text-sm bg-green-500/20 text-green-700 dark:text-green-300 px-2 py-1 rounded">{project}</span>
                       <Button
                         size="sm"
                         variant="ghost"
@@ -920,13 +1227,13 @@ function UploadView() {
 
             {/* Certifications */}
             <div className="space-y-4">
-              <h3 className="text-lg font-medium text-opensam-black">Certifications</h3>
+              <h3 className="text-lg font-medium text-foreground">Certifications</h3>
               <div>
-                <label className="text-sm font-medium text-opensam-gray-700">Certifications & Qualifications</label>
+                <label className="text-sm font-medium text-foreground">Certifications & Qualifications</label>
                 <div className="mt-1 space-y-2">
                   {certifications.map((cert, index) => (
                     <div key={index} className="flex items-center space-x-2">
-                      <span className="text-sm bg-purple-100 px-2 py-1 rounded">{cert}</span>
+                      <span className="text-sm bg-purple-500/20 text-purple-700 dark:text-purple-300 px-2 py-1 rounded">{cert}</span>
                       <Button
                         size="sm"
                         variant="ghost"
@@ -949,10 +1256,10 @@ function UploadView() {
 
             {/* Contact Information */}
             <div className="space-y-4">
-              <h3 className="text-lg font-medium text-opensam-black">Contact Information</h3>
+              <h3 className="text-lg font-medium text-foreground">Contact Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium text-opensam-gray-700">Address</label>
+                  <label className="text-sm font-medium text-foreground">Address</label>
                   <Input
                     placeholder="Street address"
                     value={contactInfo.address}
@@ -961,7 +1268,7 @@ function UploadView() {
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-opensam-gray-700">City</label>
+                  <label className="text-sm font-medium text-foreground">City</label>
                   <Input
                     placeholder="City"
                     value={contactInfo.city}
@@ -970,7 +1277,7 @@ function UploadView() {
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-opensam-gray-700">State</label>
+                  <label className="text-sm font-medium text-foreground">State</label>
                   <Input
                     placeholder="State"
                     value={contactInfo.state}
@@ -979,7 +1286,7 @@ function UploadView() {
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-opensam-gray-700">ZIP Code</label>
+                  <label className="text-sm font-medium text-foreground">ZIP Code</label>
                   <Input
                     placeholder="ZIP code"
                     value={contactInfo.zipCode}
@@ -988,7 +1295,7 @@ function UploadView() {
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-opensam-gray-700">Phone</label>
+                  <label className="text-sm font-medium text-foreground">Phone</label>
                   <Input
                     placeholder="Phone number"
                     value={contactInfo.phone}
@@ -997,7 +1304,7 @@ function UploadView() {
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-opensam-gray-700">Email</label>
+                  <label className="text-sm font-medium text-foreground">Email</label>
                   <Input
                     placeholder="Email address"
                     value={contactInfo.email}
@@ -1006,7 +1313,7 @@ function UploadView() {
                   />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="text-sm font-medium text-opensam-gray-700">Website</label>
+                  <label className="text-sm font-medium text-foreground">Website</label>
                   <Input
                     placeholder="Website URL (optional)"
                     value={contactInfo.website}
@@ -1018,7 +1325,7 @@ function UploadView() {
             </div>
 
             {/* Save Button */}
-            <div className="flex justify-end space-x-4 pt-6 border-t border-opensam-gray-200">
+            <div className="flex justify-end space-x-4 pt-6 border-t border-border">
               <Button variant="outline" onClick={() => window.location.reload()}>
                 Reset
               </Button>
@@ -1029,25 +1336,365 @@ function UploadView() {
 
             {/* SAM Entity Data Display */}
             {companyProfile?.samEntityData && (
-              <div className="mt-6 p-4 bg-opensam-gray-50 rounded-lg">
-                <h4 className="font-medium text-opensam-black mb-2">SAM.gov Entity Data</h4>
+              <div className="mt-6 p-4 bg-card rounded-lg">
+                <h4 className="font-medium text-foreground mb-2">SAM.gov Entity Data</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                   <div>
-                    <span className="font-medium">CAGE Code:</span> {companyProfile.samEntityData.cageCode}
+                    <span className="font-medium">CAGE Code:</span> {companyProfile.samEntityData.entityRegistration.cageCode}
                   </div>
                   <div>
-                    <span className="font-medium">DUNS:</span> {companyProfile.samEntityData.duns}
+                    <span className="font-medium">Registration Status:</span> {companyProfile.samEntityData.entityRegistration.registrationStatus}
                   </div>
                   <div>
-                    <span className="font-medium">Registration Status:</span> {companyProfile.samEntityData.registrationStatus}
+                    <span className="font-medium">Registration Date:</span> {new Date(companyProfile.samEntityData.entityRegistration.registrationDate).toLocaleDateString()}
                   </div>
                   <div>
-                    <span className="font-medium">Last Updated:</span> {new Date(companyProfile.samEntityData.lastUpdated).toLocaleDateString()}
+                    <span className="font-medium">Last Updated:</span> {new Date(companyProfile.samEntityData.entityRegistration.lastUpdateDate).toLocaleDateString()}
                   </div>
                 </div>
               </div>
             )}
           </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// Vector Store View Component
+function VectorStoreView() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [vectorStoreData, setVectorStoreData] = useState<any>(null);
+  const [selectedCollection, setSelectedCollection] = useState<string | null>(null);
+  const [collectionDetails, setCollectionDetails] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Load vector store data on component mount
+  useEffect(() => {
+    loadVectorStoreData();
+  }, []);
+
+  const loadVectorStoreData = async () => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const response = await fetch('/api/vector-store');
+      const result = await response.json();
+      
+      if (result.success) {
+        setVectorStoreData(result.data);
+      } else {
+        setError(result.error || 'Failed to load vector store data');
+      }
+    } catch (error) {
+      console.error('Failed to load vector store data:', error);
+      setError('Failed to connect to vector store');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadCollectionDetails = async (collectionName: string) => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const response = await fetch(`/api/vector-store?action=sample&collection=${collectionName}&limit=20`);
+      const result = await response.json();
+      
+      if (result.success) {
+        setCollectionDetails(result.data);
+        setSelectedCollection(collectionName);
+      } else {
+        setError(result.error || 'Failed to load collection details');
+      }
+    } catch (error) {
+      console.error('Failed to load collection details:', error);
+      setError('Failed to load collection details');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const deleteCollection = async (collectionName: string) => {
+    if (!confirm(`Are you sure you want to delete the collection "${collectionName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const response = await fetch(`/api/vector-store?action=delete&collection=${collectionName}`, {
+        method: 'GET'
+      });
+      const result = await response.json();
+      
+      if (result.success) {
+        // Reload data after deletion
+        await loadVectorStoreData();
+        if (selectedCollection === collectionName) {
+          setSelectedCollection(null);
+          setCollectionDetails(null);
+        }
+      } else {
+        setError(result.error || 'Failed to delete collection');
+      }
+    } catch (error) {
+      console.error('Failed to delete collection:', error);
+      setError('Failed to delete collection');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const formatMetadata = (metadata: any) => {
+    if (!metadata) return 'No metadata';
+    
+    return Object.entries(metadata)
+      .filter(([key, value]) => value !== null && value !== undefined && value !== '')
+      .map(([key, value]) => {
+        if (typeof value === 'object') {
+          return `${key}: ${JSON.stringify(value)}`;
+        }
+        return `${key}: ${value}`;
+      })
+      .join(', ');
+  };
+
+  if (isLoading && !vectorStoreData) {
+    return (
+      <div className="max-w-6xl mx-auto space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Database className="h-5 w-5 mr-2" />
+              Vector Store Dashboard
+            </CardTitle>
+            <CardDescription>
+              View and manage your vector store data and collections.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <span className="ml-2 text-muted-foreground">Loading vector store data...</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-6xl mx-auto space-y-6">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center">
+              <Database className="h-5 w-5 mr-2" />
+              Vector Store Dashboard
+            </CardTitle>
+            <Button onClick={loadVectorStoreData} variant="outline" size="sm">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+          </div>
+          <CardDescription>
+            View and manage your vector store data and collections.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {error && (
+            <div className="mb-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+              <p className="text-destructive text-sm">{error}</p>
+            </div>
+          )}
+
+          {/* Vector Store Status */}
+          {vectorStoreData?.stats && (
+            <div className="mb-6">
+              <h3 className="text-lg font-medium text-foreground mb-4">Vector Store Status</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-muted-foreground">Connection Status</span>
+                    <div className={cn(
+                      "w-2 h-2 rounded-full",
+                      vectorStoreData.stats.connected ? "bg-green-500" : "bg-red-500"
+                    )} />
+                  </div>
+                  <p className="text-lg font-semibold mt-1">
+                    {vectorStoreData.stats.connected ? 'Connected' : 'Disconnected'}
+                  </p>
+                </div>
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <span className="text-sm font-medium text-muted-foreground">Total Collections</span>
+                  <p className="text-lg font-semibold mt-1">{vectorStoreData.stats.collections.length}</p>
+                </div>
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <span className="text-sm font-medium text-muted-foreground">Active Collections</span>
+                  <p className="text-lg font-semibold mt-1">
+                    {vectorStoreData.collections?.filter((col: any) => col.hasData).length || 0}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Collections */}
+          {vectorStoreData?.collections && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium text-foreground">Collections</h3>
+              
+              {vectorStoreData.collections.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Database className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No collections found in the vector store.</p>
+                  <p className="text-sm">Collections will appear here when you add data to the vector store.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {vectorStoreData.collections.map((collection: any) => (
+                    <Card key={collection.name} className="relative">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-base">{collection.name}</CardTitle>
+                          <div className="flex items-center space-x-2">
+                            {collection.hasData ? (
+                              <span className="text-xs bg-green-500/20 text-green-700 dark:text-green-300 px-2 py-1 rounded">
+                                {collection.sampleCount} items
+                              </span>
+                            ) : (
+                              <span className="text-xs bg-gray-500/20 text-gray-700 dark:text-gray-300 px-2 py-1 rounded">
+                                Empty
+                              </span>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => deleteCollection(collection.name)}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              ×
+                            </Button>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        {collection.error ? (
+                          <p className="text-sm text-destructive">{collection.error}</p>
+                        ) : (
+                          <div className="space-y-3">
+                            {collection.samples.length > 0 ? (
+                              <div className="space-y-2">
+                                <p className="text-sm text-muted-foreground">Sample Data:</p>
+                                {collection.samples.map((sample: any, index: number) => (
+                                  <div key={index} className="p-3 bg-muted/30 rounded border">
+                                    <div className="flex items-start justify-between">
+                                      <div className="flex-1">
+                                        <p className="text-sm font-medium text-foreground">
+                                          ID: {sample.id}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                          Score: {sample.score?.toFixed(3) || 'N/A'}
+                                        </p>
+                                        {sample.metadata && (
+                                          <p className="text-xs text-muted-foreground mt-1">
+                                            {formatMetadata(sample.metadata)}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-muted-foreground">No sample data available</p>
+                            )}
+                            
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => loadCollectionDetails(collection.name)}
+                              className="w-full"
+                            >
+                              View Details
+                            </Button>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Collection Details Modal */}
+          {selectedCollection && collectionDetails && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-background rounded-lg p-6 w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-semibold">Collection: {selectedCollection}</h3>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      setSelectedCollection(null);
+                      setCollectionDetails(null);
+                    }}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+                
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">
+                      Total items: {collectionDetails.count}
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    {collectionDetails.samples.map((sample: any, index: number) => (
+                      <Card key={index}>
+                        <CardContent className="p-4">
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <p className="font-medium text-foreground">ID: {sample.id}</p>
+                              <span className="text-sm text-muted-foreground">
+                                Score: {sample.score?.toFixed(3) || 'N/A'}
+                              </span>
+                            </div>
+                            
+                            {sample.metadata && (
+                              <div className="space-y-1">
+                                <p className="text-sm font-medium text-foreground">Metadata:</p>
+                                <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded">
+                                  <pre className="whitespace-pre-wrap">{formatMetadata(sample.metadata)}</pre>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {sample.values && (
+                              <div className="space-y-1">
+                                <p className="text-sm font-medium text-foreground">Vector (first 10 dimensions):</p>
+                                <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded">
+                                  [{sample.values.slice(0, 10).map((v: number) => v.toFixed(4)).join(', ')}...]
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

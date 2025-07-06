@@ -169,20 +169,6 @@ export function truncate(text: string, length: number, suffix: string = '...'): 
 }
 
 /**
- * Convert bytes to human-readable format
- * @param bytes - Number of bytes
- * @param decimals - Number of decimal places
- * @returns Formatted string
- */
-export function formatBytes(bytes: number, decimals: number = 2): string {
-  if (bytes === 0) return '0 Bytes';
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(decimals)) + ' ' + sizes[i];
-}
-
-/**
  * Calculate cosine similarity between two vectors
  * @param a - First vector
  * @param b - Second vector
@@ -219,7 +205,7 @@ export function cosineSimilarity(a: number[], b: number[]): number {
  * Encrypt data using AES
  * @param data - Data to encrypt
  * @param key - Encryption key
- * @returns Encrypted string
+ * @returns Encrypted data
  */
 export function encryptData(data: string, key: string): string {
   return CryptoJS.AES.encrypt(data, key).toString();
@@ -228,8 +214,8 @@ export function encryptData(data: string, key: string): string {
 /**
  * Decrypt data using AES
  * @param encryptedData - Encrypted data
- * @param key - Decryption key
- * @returns Decrypted string
+ * @param key - Encryption key
+ * @returns Decrypted data
  */
 export function decryptData(encryptedData: string, key: string): string {
   const bytes = CryptoJS.AES.decrypt(encryptedData, key);
@@ -238,10 +224,10 @@ export function decryptData(encryptedData: string, key: string): string {
 
 /**
  * Generate a random encryption key
- * @returns Random key string
+ * @returns Random encryption key
  */
 export function generateEncryptionKey(): string {
-  return CryptoJS.lib.WordArray.random(256 / 8).toString();
+  return CryptoJS.lib.WordArray.random(32).toString();
 }
 
 /**
@@ -269,20 +255,9 @@ export function isValidUrl(url: string): boolean {
 }
 
 /**
- * Extract text from HTML
- * @param html - HTML string
- * @returns Plain text
- */
-export function extractTextFromHTML(html: string): string {
-  const div = document.createElement('div');
-  div.innerHTML = html;
-  return div.textContent || div.innerText || '';
-}
-
-/**
  * Sleep for specified milliseconds
  * @param ms - Milliseconds to sleep
- * @returns Promise that resolves after the specified time
+ * @returns Promise that resolves after specified time
  */
 export function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));

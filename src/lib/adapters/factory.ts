@@ -1,13 +1,25 @@
 import { EnvironmentConfig, CacheAdapter, VectorStoreAdapter } from './types';
-import { RedisCacheAdapter } from './redis-cache';
 import { UpstashCacheAdapter } from './upstash-cache';
+import { BrowserCacheAdapter } from './browser-cache';
 import { ChromaVectorAdapter } from './chroma-vector';
 import { PineconeVectorAdapter } from './pinecone-vector';
+
+// Import Redis adapter only on server-side
+let RedisCacheAdapter: any = null;
+if (typeof window === 'undefined') {
+  // Server-side only
+  const redisModule = require('./redis-cache');
+  RedisCacheAdapter = redisModule.RedisCacheAdapter;
+}
 
 // Cache adapter factory
 export function createCacheAdapter(config: EnvironmentConfig['cache']): CacheAdapter {
   switch (config.provider) {
     case 'redis':
+      if (!RedisCacheAdapter) {
+        console.warn('⚠️ Redis not available in browser, falling back to browser cache');
+        return new BrowserCacheAdapter();
+      }
       return new RedisCacheAdapter({
         url: config.url,
         password: config.password,
@@ -16,15 +28,20 @@ export function createCacheAdapter(config: EnvironmentConfig['cache']): CacheAda
     
     case 'upstash':
       if (!config.url || !config.password) {
-        throw new Error('Upstash Redis requires both URL and password');
+        console.warn('⚠️ Upstash configuration incomplete, falling back to browser cache');
+        return new BrowserCacheAdapter();
       }
       return new UpstashCacheAdapter({
         url: config.url,
         password: config.password
       });
     
+    case 'browser':
+      return new BrowserCacheAdapter();
+    
     default:
-      throw new Error(`Unsupported cache provider: ${config.provider}`);
+      console.warn(`⚠️ Unknown cache provider: ${config.provider}, falling back to browser cache`);
+      return new BrowserCacheAdapter();
   }
 }
 
@@ -54,10 +71,12 @@ export function createVectorStoreAdapter(config: EnvironmentConfig['vectorStore'
 // Environment configuration loader
 export function loadEnvironmentConfig(): EnvironmentConfig {
   const isProduction = process.env.NODE_ENV === 'production';
+  const isBrowser = typeof window !== 'undefined';
   
   return {
     cache: {
-      provider: (process.env.CACHE_PROVIDER as 'redis' | 'upstash') || (isProduction ? 'upstash' : 'redis'),
+      provider: (process.env.CACHE_PROVIDER as 'redis' | 'upstash' | 'browser') || 
+                (isBrowser ? 'browser' : (isProduction ? 'upstash' : 'redis')),
       url: process.env.CACHE_URL,
       password: process.env.CACHE_PASSWORD,
       database: process.env.CACHE_DB ? parseInt(process.env.CACHE_DB) : undefined

@@ -2,13 +2,18 @@
 const nextConfig = {
   reactStrictMode: true,
   webpack: (config, { isServer }) => {
-    // Fix for pdf-parse in client-side builds
+    // Fix for Node.js modules in client-side builds
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
         fs: false,
         path: false,
         crypto: false,
+        dns: false,
+        net: false,
+        tls: false,
+        child_process: false,
+        os: false,
       };
     }
     return config;

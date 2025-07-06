@@ -33,6 +33,21 @@
     --ring: 0 0% 0%;
 
     --radius: 0.5rem;
+
+    /* OpenSAM light mode colors */
+    --opensam-black: 0 0% 0%;
+    --opensam-white: 0 0% 100%;
+    --opensam-gray-50: 0 0% 98%;
+    --opensam-gray-100: 0 0% 96%;
+    --opensam-gray-200: 0 0% 90%;
+    --opensam-gray-300: 0 0% 83%;
+    --opensam-gray-400: 0 0% 64%;
+    --opensam-gray-500: 0 0% 45%;
+    --opensam-gray-600: 0 0% 32%;
+    --opensam-gray-700: 0 0% 25%;
+    --opensam-gray-800: 0 0% 15%;
+    --opensam-gray-900: 0 0% 9%;
+    --opensam-gray-950: 0 0% 4%;
   }
 
   .dark {
@@ -63,6 +78,21 @@
     --border: 0 0% 15%;
     --input: 0 0% 15%;
     --ring: 0 0% 83%;
+
+    /* OpenSAM dark mode colors */
+    --opensam-black: 0 0% 98%;
+    --opensam-white: 0 0% 4%;
+    --opensam-gray-50: 0 0% 9%;
+    --opensam-gray-100: 0 0% 15%;
+    --opensam-gray-200: 0 0% 25%;
+    --opensam-gray-300: 0 0% 35%;
+    --opensam-gray-400: 0 0% 45%;
+    --opensam-gray-500: 0 0% 55%;
+    --opensam-gray-600: 0 0% 65%;
+    --opensam-gray-700: 0 0% 75%;
+    --opensam-gray-800: 0 0% 85%;
+    --opensam-gray-900: 0 0% 95%;
+    --opensam-gray-950: 0 0% 98%;
   }
 }
 
@@ -216,6 +246,77 @@ code {
 
 pre code {
   @apply bg-transparent p-0;
+}
+
+/* Enhanced markdown styling for chat */
+.chat-markdown {
+  @apply text-sm leading-relaxed;
+}
+
+.chat-markdown h1,
+.chat-markdown h2,
+.chat-markdown h3,
+.chat-markdown h4 {
+  @apply font-semibold text-opensam-black mb-2;
+}
+
+.chat-markdown h1 {
+  @apply text-lg;
+}
+
+.chat-markdown h2 {
+  @apply text-base;
+}
+
+.chat-markdown h3,
+.chat-markdown h4 {
+  @apply text-sm;
+}
+
+.chat-markdown p {
+  @apply mb-2 last:mb-0;
+}
+
+.chat-markdown ul,
+.chat-markdown ol {
+  @apply mb-2 pl-4;
+}
+
+.chat-markdown li {
+  @apply mb-1;
+}
+
+.chat-markdown blockquote {
+  @apply border-l-4 border-opensam-black bg-opensam-gray-50 pl-3 py-1 italic;
+}
+
+.chat-markdown table {
+  @apply w-full border-collapse border border-opensam-gray-200 mb-3;
+}
+
+.chat-markdown th,
+.chat-markdown td {
+  @apply border border-opensam-gray-200 px-2 py-1 text-xs;
+}
+
+.chat-markdown th {
+  @apply font-semibold bg-opensam-gray-50;
+}
+
+.chat-markdown a {
+  @apply text-opensam-black underline hover:text-opensam-gray-600;
+}
+
+.chat-markdown strong {
+  @apply font-semibold;
+}
+
+.chat-markdown em {
+  @apply italic;
+}
+
+.chat-markdown hr {
+  @apply border-opensam-gray-200 my-3;
 }
 
 /* Focus states for accessibility */

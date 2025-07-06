@@ -6,14 +6,25 @@ export class ChromaVectorAdapter implements VectorStoreAdapter {
   private collections: Map<string, Collection> = new Map();
 
   constructor(config: { url?: string }) {
-    const url = config.url || 'http://localhost:8000';
-    // Parse URL to get host and port
-    const urlObj = new URL(url);
-    this.client = new ChromaClient({ 
-      host: urlObj.hostname,
-      port: parseInt(urlObj.port) || 8000,
-      ssl: urlObj.protocol === 'https:'
-    });
+    // Check if we're running in the browser
+    const isBrowser = typeof window !== 'undefined';
+    
+    if (isBrowser) {
+      // In browser, use the Next.js proxy to avoid CORS issues
+      this.client = new ChromaClient({
+        host: window.location.hostname,
+        port: parseInt(window.location.port) || 80,
+        ssl: window.location.protocol === 'https:',
+        path: '/api/chromadb-proxy'
+      });
+    } else {
+      // Server-side: direct connection to ChromaDB
+      this.client = new ChromaClient({
+        host: 'localhost',
+        port: 8000,
+        ssl: false
+      });
+    }
     console.log('✅ ChromaDB client initialized');
   }
 
@@ -82,11 +93,17 @@ export class ChromaVectorAdapter implements VectorStoreAdapter {
     try {
       const chromaCollection = await this.getCollection(collection);
       
-      const queryResult = await chromaCollection.query({
+      const queryOptions: any = {
         queryEmbeddings: [vector],
         nResults: topK,
-        where: filter
-      });
+      };
+
+      // Only add where clause if filter is provided and not empty
+      if (filter && Object.keys(filter).length > 0) {
+        queryOptions.where = filter;
+      }
+
+      const queryResult = await chromaCollection.query(queryOptions);
 
       if (!queryResult.ids || !queryResult.embeddings || !queryResult.metadatas) {
         return [];
@@ -164,9 +181,11 @@ export class ChromaVectorAdapter implements VectorStoreAdapter {
 
   async isConnected(): Promise<boolean> {
     try {
-      await this.client.heartbeat();
+      // For embedded ChromaDB, try to list collections as a connection test
+      await this.client.listCollections();
       return true;
     } catch (error) {
+      console.error('ChromaDB connection test failed:', error);
       return false;
     }
   }
