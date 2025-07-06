@@ -1,15 +1,19 @@
 import { EnvironmentConfig, CacheAdapter, VectorStoreAdapter } from './types';
 import { UpstashCacheAdapter } from './upstash-cache';
 import { BrowserCacheAdapter } from './browser-cache';
-import { ChromaVectorAdapter } from './chroma-vector';
 import { PineconeVectorAdapter } from './pinecone-vector';
 
-// Import Redis adapter only on server-side
+// Import server-side adapters only when not in browser
 let RedisCacheAdapter: any = null;
+let ChromaVectorAdapter: any = null;
+
 if (typeof window === 'undefined') {
   // Server-side only
   const redisModule = require('./redis-cache');
   RedisCacheAdapter = redisModule.RedisCacheAdapter;
+  
+  const chromaModule = require('./chroma-vector');
+  ChromaVectorAdapter = chromaModule.ChromaVectorAdapter;
 }
 
 // Cache adapter factory
@@ -49,6 +53,18 @@ export function createCacheAdapter(config: EnvironmentConfig['cache']): CacheAda
 export function createVectorStoreAdapter(config: EnvironmentConfig['vectorStore']): VectorStoreAdapter {
   switch (config.provider) {
     case 'chroma':
+      if (!ChromaVectorAdapter) {
+        console.warn('⚠️ ChromaDB not available in browser, falling back to Pinecone');
+        // Fall back to Pinecone or throw error
+        if (!config.apiKey || !config.environment) {
+          throw new Error('ChromaDB not available in browser and Pinecone not configured');
+        }
+        return new PineconeVectorAdapter({
+          apiKey: config.apiKey,
+          environment: config.environment,
+          projectId: config.projectId
+        });
+      }
       return new ChromaVectorAdapter({
         url: config.url
       });

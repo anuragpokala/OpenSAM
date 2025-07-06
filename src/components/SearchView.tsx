@@ -267,16 +267,20 @@ export default function SearchView() {
             useAppStore.setState({ cacheNotificationDismissed: false });
           }
           
-          // Add opportunities to vector store for future matching
-          try {
-            const { vectorStoreUtils } = await import('@/lib/vectorStore');
-            for (const opportunity of data.data.opportunities) {
-              await vectorStoreUtils.addOpportunity(opportunity);
+          // Add opportunities to vector store for future matching (server-side only)
+          if (typeof window === 'undefined') {
+            try {
+              const { vectorStoreUtils } = await import('@/lib/vectorStore');
+              for (const opportunity of data.data.opportunities) {
+                await vectorStoreUtils.addOpportunity(opportunity);
+              }
+              console.log(`✅ Added ${data.data.opportunities.length} opportunities to vector store`);
+            } catch (vectorError) {
+              console.warn('⚠️ Failed to add opportunities to vector store:', vectorError);
+              // Don't fail the search if vector store is unavailable
             }
-            console.log(`✅ Added ${data.data.opportunities.length} opportunities to vector store`);
-          } catch (vectorError) {
-            console.warn('⚠️ Failed to add opportunities to vector store:', vectorError);
-            // Don't fail the search if vector store is unavailable
+          } else {
+            console.log('ℹ️ Vector store operations skipped in browser environment');
           }
         } else {
           console.error('Search API error:', data.error);
