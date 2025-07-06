@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { vectorStoreUtils } from '@/lib/vectorStore';
+import { vectorStoreServerUtils } from '@/lib/vectorStore-server';
 import { VectorSearchQuery, SemanticSearchResult } from '@/types';
 
 // Rate limiting configuration
@@ -88,9 +88,9 @@ export async function GET(req: NextRequest) {
     
     try {
       // Convert query to vector (using the same method as addOpportunity)
-      const queryVector = vectorStoreUtils.textToSimpleVector(query);
+      const queryVector = vectorStoreServerUtils.textToSimpleVector(query);
       
-      const results = await vectorStoreUtils.searchVectors(
+      const results = await vectorStoreServerUtils.searchVectors(
         queryVector,
         'sam_opportunities',
         limit ? parseInt(limit) : 20,
@@ -138,7 +138,7 @@ export async function GET(req: NextRequest) {
         error: searchError,
         query,
         filters,
-        vectorStoreStats: await vectorStoreUtils.getStats()
+        vectorStoreStats: await vectorStoreServerUtils.getStats()
       });
       throw searchError;
     }
@@ -177,10 +177,10 @@ export async function POST(req: NextRequest) {
     }
     
     // Convert content to vector
-    const vector = vectorStoreUtils.textToSimpleVector(content);
+    const vector = vectorStoreServerUtils.textToSimpleVector(content);
     
     // Add document to vector store
-    await vectorStoreUtils.storeVectors([{
+    await vectorStoreServerUtils.storeVectors([{
       id: metadata?.id || `doc_${Date.now()}`,
       values: vector,
       metadata: {
@@ -215,7 +215,7 @@ export async function POST(req: NextRequest) {
  */
 export async function OPTIONS(req: NextRequest) {
   try {
-    const stats = await vectorStoreUtils.getStats();
+    const stats = await vectorStoreServerUtils.getStats();
     
     return NextResponse.json({
       success: true,

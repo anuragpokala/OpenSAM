@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { LLMProvider, LLMMessage, LLMResponse } from '@/types';
-import { vectorStoreUtils } from '@/lib/vectorStore';
+import { LLMProvider, LLMMessage, LLMResponse, CompanyProfile } from '@/types';
+import { vectorStoreServerUtils } from '@/lib/vectorStore-server';
+import { chatWithRAG, findMatchingOpportunities } from '@/lib/chat-rag';
 
 // Rate limiting configuration
 const RATE_LIMIT_WINDOW = 60000; // 1 minute
@@ -267,7 +268,7 @@ export async function POST(req: NextRequest) {
   }
   
   try {
-    const { model, messages, context } = await req.json();
+    const { model, messages, context, companyProfile } = await req.json();
     
     // Validate input
     if (!model || !messages || !Array.isArray(messages)) {
@@ -315,42 +316,105 @@ export async function POST(req: NextRequest) {
       }, { status: 200 });
     }
     
-    // Call appropriate LLM provider
+    // Call appropriate LLM provider with RAG if company profile is provided
     let response: LLMResponse;
     
-    switch (provider as LLMProvider) {
-      case 'openai':
-        response = await callOpenAI(
-          messages, 
-          modelName, 
-          apiKey, 
-          context?.temperature, 
-          context?.maxTokens
-        );
-        break;
-        
-      case 'anthropic':
-        response = await callAnthropic(
-          messages, 
-          modelName, 
-          apiKey, 
-          context?.temperature, 
-          context?.maxTokens
-        );
-        break;
-        
-      case 'huggingface':
-        response = await callHuggingFace(
-          messages, 
-          modelName, 
-          apiKey, 
-          context?.temperature, 
-          context?.maxTokens
-        );
-        break;
-        
-      default:
-        throw new Error(`Unsupported provider: ${provider}`);
+    if (companyProfile) {
+      // Use RAG with company profile
+      const ragResult = await chatWithRAG(
+        messages[messages.length - 1].content, // Get the last user message
+        companyProfile,
+        async (systemPrompt: string, userPrompt: string) => {
+          // Create a custom LLM function that uses the selected provider
+          const ragMessages = [
+            { role: 'system' as const, content: systemPrompt },
+            { role: 'user' as const, content: userPrompt }
+          ];
+          
+          switch (provider as LLMProvider) {
+            case 'openai':
+              const openaiResponse = await callOpenAI(
+                ragMessages, 
+                modelName, 
+                apiKey, 
+                context?.temperature, 
+                context?.maxTokens
+              );
+              return openaiResponse.content;
+              
+            case 'anthropic':
+              const anthropicResponse = await callAnthropic(
+                ragMessages, 
+                modelName, 
+                apiKey, 
+                context?.temperature, 
+                context?.maxTokens
+              );
+              return anthropicResponse.content;
+              
+            case 'huggingface':
+              const huggingfaceResponse = await callHuggingFace(
+                ragMessages, 
+                modelName, 
+                apiKey, 
+                context?.temperature, 
+                context?.maxTokens
+              );
+              return huggingfaceResponse.content;
+              
+            default:
+              throw new Error(`Unsupported provider: ${provider}`);
+          }
+        }
+      );
+      
+      // Create response with RAG context
+      response = {
+        content: ragResult.response,
+        usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+        model: modelName,
+        provider: provider as LLMProvider,
+        ragContext: {
+          opportunities: ragResult.opportunities,
+          companyProfile: companyProfile
+        }
+      };
+    } else {
+      // Standard chat without RAG
+      switch (provider as LLMProvider) {
+        case 'openai':
+          response = await callOpenAI(
+            messages, 
+            modelName, 
+            apiKey, 
+            context?.temperature, 
+            context?.maxTokens
+          );
+          break;
+          
+        case 'anthropic':
+          response = await callAnthropic(
+            messages, 
+            modelName, 
+            apiKey, 
+            context?.temperature, 
+            context?.maxTokens
+          );
+          break;
+          
+        case 'huggingface':
+          response = await callHuggingFace(
+            messages, 
+            modelName, 
+            apiKey, 
+            context?.temperature, 
+            context?.maxTokens
+          );
+          break;
+          
+        default:
+          throw new Error(`Unsupported provider: ${provider}`);
+      }
     }
     
     // Return response

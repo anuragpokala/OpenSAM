@@ -103,6 +103,34 @@ function formatCompanyProfile(profile: CompanyProfile): string {
   return sections.join('\n');
 }
 
+function getMatchScoreCacheKey(companyId: string, opportunityId: string) {
+  return `opensam-matchscore-${companyId}-${opportunityId}`;
+}
+
+function getCachedMatchScore(companyId: string, opportunityId: string): number | null {
+  if (typeof window === 'undefined') return null;
+  const key = getMatchScoreCacheKey(companyId, opportunityId);
+  const cached = localStorage.getItem(key);
+  if (!cached) return null;
+  try {
+    const { score, timestamp } = JSON.parse(cached);
+    // 7 days expiry
+    if (Date.now() - timestamp < 7 * 24 * 60 * 60 * 1000) {
+      return score;
+    }
+    localStorage.removeItem(key);
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function setCachedMatchScore(companyId: string, opportunityId: string, score: number) {
+  if (typeof window === 'undefined') return;
+  const key = getMatchScoreCacheKey(companyId, opportunityId);
+  localStorage.setItem(key, JSON.stringify({ score, timestamp: Date.now() }));
+}
+
 /**
  * Find matching opportunities for a company profile
  */
@@ -124,8 +152,8 @@ export async function findMatchingOpportunities(
         { type: 'opportunity' }
       );
 
-      return results.map(result => ({
-        opportunity: {
+      return results.map(result => {
+        const opportunity = {
           id: result.id,
           noticeId: result.id,
           title: result.metadata?.title || '',
@@ -151,12 +179,27 @@ export async function findMatchingOpportunities(
             zip: '',
             country: { code: 'US', name: 'United States' }
           }
-        } as SAMOpportunity,
-        score: result.score
-      }));
+        } as SAMOpportunity;
+        // --- Caching logic ---
+        let score = getCachedMatchScore(companyProfile.id, opportunity.id);
+        if (score === null) {
+          // Convert similarity to percent (if needed)
+          score = Math.round((result.score ?? 0) * 100);
+          setCachedMatchScore(companyProfile.id, opportunity.id, score);
+        }
+        return { opportunity, score };
+      });
     } else {
       // Profile-based matching
-      return await vectorStoreUtils.findMatchingOpportunities(companyProfile, limit);
+      const matches = await vectorStoreUtils.findMatchingOpportunities(companyProfile, limit);
+      return matches.map(({ opportunity, score }) => {
+        let cachedScore = getCachedMatchScore(companyProfile.id, opportunity.id);
+        if (cachedScore === null) {
+          cachedScore = Math.round((score ?? 0) * 100);
+          setCachedMatchScore(companyProfile.id, opportunity.id, cachedScore);
+        }
+        return { opportunity, score: cachedScore };
+      });
     }
   } catch (error) {
     console.error('Failed to find matching opportunities:', error);

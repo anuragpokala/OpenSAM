@@ -31,6 +31,10 @@ export interface LLMResponse {
   };
   model: string;
   provider: LLMProvider;
+  ragContext?: {
+    opportunities: Array<{ opportunity: SAMOpportunity; score: number }>;
+    companyProfile: CompanyProfile;
+  };
 }
 
 // SAM.gov Types

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { vectorStoreUtils } from '@/lib/vectorStore';
 import { getEmbeddingService } from '@/lib/embed';
+import { vectorStoreServerUtils } from '@/lib/vectorStore-server';
 
 /**
  * Match company profile with opportunities
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
       const embeddingService = getEmbeddingService();
       const queryVector = await embeddingService.getEmbedding(query);
       
-      const vectorResults = await vectorStoreUtils.searchVectors(
+      const vectorResults = await vectorStoreServerUtils.searchVectors(
         queryVector,
         'sam_opportunities',
         limit,
@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
       }));
     } else {
       // Profile-based matching: find opportunities similar to company profile
-      results = await vectorStoreUtils.findMatchingOpportunities(companyProfile, limit);
+              results = await vectorStoreServerUtils.findMatchingOpportunities(companyProfile, limit);
     }
 
     return NextResponse.json({
@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Add company profile to vector store
-    await vectorStoreUtils.addCompanyProfile(companyProfile, embeddingConfig);
+          await vectorStoreServerUtils.addCompanyProfile(companyProfile, embeddingConfig);
 
     return NextResponse.json({
       success: true,

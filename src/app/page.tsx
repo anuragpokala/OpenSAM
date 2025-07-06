@@ -16,7 +16,8 @@ import {
   Filter,
   Download,
   RefreshCw,
-  Database
+  Database,
+  Building
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,6 +30,28 @@ import SearchView from '@/components/SearchView';
 import CacheStatus from '@/components/CacheStatus';
 import { MarkdownRenderer } from '@/components/ui/markdown-renderer';
 import { CompanyProfile } from '@/types';
+
+// Add logo SVGs at the top (after imports)
+const OpenAILogo = ({ className = "" }) => (
+  <svg className={className} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="16" cy="16" r="16" fill="#10A37F" />
+    <path d="M16 7.5c-2.5 0-4.5 2-4.5 4.5v8c0 2.5 2 4.5 4.5 4.5s4.5-2 4.5-4.5v-8c0-2.5-2-4.5-4.5-4.5z" fill="#fff"/>
+  </svg>
+);
+const AnthropicLogo = ({ className = "" }) => (
+  <svg className={className} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="4" y="4" width="24" height="24" rx="12" fill="#FFCD1C" />
+    <rect x="10" y="10" width="12" height="12" rx="6" fill="#fff" />
+  </svg>
+);
+const HuggingFaceLogo = ({ className = "" }) => (
+  <svg className={className} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="16" cy="16" r="16" fill="#FFD21F" />
+    <ellipse cx="16" cy="20" rx="7" ry="3" fill="#fff" />
+    <ellipse cx="12" cy="14" rx="1.5" ry="2" fill="#000" />
+    <ellipse cx="20" cy="14" rx="1.5" ry="2" fill="#000" />
+  </svg>
+);
 
 // Navigation items
 const navigationItems = [
@@ -44,16 +67,19 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false);
+  const [selectedCompanyProfile, setSelectedCompanyProfile] = useState<CompanyProfile | null>(null);
   
   const { sidebarOpen, currentView, theme } = useUIState();
   const llmConfig = useLLMConfig();
+  const companyProfile = useCompanyProfile();
   const { 
     setSidebarOpen, 
     setCurrentView, 
     setLLMProvider, 
     setLLMModel, 
     setLLMApiKey,
-    validateLLMConfig 
+    validateLLMConfig,
+    loadProfile
   } = useAppStore();
 
   // Initialize app
@@ -78,6 +104,33 @@ export default function Dashboard() {
 
     initializeApp();
   }, [llmConfig]);
+
+  // Load selected company profile from localStorage on mount
+  useEffect(() => {
+    const savedProfileId = localStorage.getItem('opensam-selected-company-profile');
+    if (savedProfileId && !selectedCompanyProfile) {
+      const savedProfile = loadProfile(savedProfileId);
+      if (savedProfile) {
+        setSelectedCompanyProfile(savedProfile);
+      }
+    }
+  }, [selectedCompanyProfile, loadProfile]);
+
+  // Set default company profile if available
+  useEffect(() => {
+    if (companyProfile && !selectedCompanyProfile) {
+      setSelectedCompanyProfile(companyProfile);
+    }
+  }, [companyProfile, selectedCompanyProfile]);
+
+  // Save selected company profile to localStorage when it changes
+  useEffect(() => {
+    if (selectedCompanyProfile) {
+      localStorage.setItem('opensam-selected-company-profile', selectedCompanyProfile.id);
+    } else {
+      localStorage.removeItem('opensam-selected-company-profile');
+    }
+  }, [selectedCompanyProfile]);
 
   // Handle API key setup
   const handleApiKeySetup = async (provider: string, apiKey: string) => {
@@ -160,23 +213,26 @@ export default function Dashboard() {
                 <Button
                   variant={llmConfig.provider === 'openai' ? 'default' : 'outline'}
                   size="sm"
+                  aria-label="OpenAI"
                   onClick={() => setLLMProvider('openai')}
                 >
-                  OpenAI
+                  <OpenAILogo className="h-5 w-5" />
                 </Button>
                 <Button
                   variant={llmConfig.provider === 'anthropic' ? 'default' : 'outline'}
                   size="sm"
+                  aria-label="Anthropic"
                   onClick={() => setLLMProvider('anthropic')}
                 >
-                  Anthropic
+                  <AnthropicLogo className="h-5 w-5" />
                 </Button>
                 <Button
                   variant={llmConfig.provider === 'huggingface' ? 'default' : 'outline'}
                   size="sm"
+                  aria-label="Hugging Face"
                   onClick={() => setLLMProvider('huggingface')}
                 >
-                  Hugging Face
+                  <HuggingFaceLogo className="h-5 w-5" />
                 </Button>
               </div>
               
@@ -224,6 +280,22 @@ export default function Dashboard() {
                 {llmConfig.apiKey ? `${llmConfig.provider} connected` : 'No API key'}
               </span>
             </div>
+            {/* Global Company Profile Indicator */}
+            <div className="hidden sm:flex items-center space-x-2 text-sm">
+              {selectedCompanyProfile ? (
+                <div className="flex items-center space-x-1 px-2 py-1 bg-blue-50 border border-blue-200 rounded-md">
+                  <Building className="h-3 w-3 text-blue-600" />
+                  <span className="text-blue-700 font-medium">
+                    {selectedCompanyProfile.entityName}
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center space-x-1 px-2 py-1 bg-gray-50 border border-gray-200 rounded-md">
+                  <Building className="h-3 w-3 text-gray-500" />
+                  <span className="text-gray-600">No Company Selected</span>
+                </div>
+              )}
+            </div>
             <ThemeToggle />
             <Button
               variant="ghost"
@@ -237,7 +309,7 @@ export default function Dashboard() {
 
         {/* Main Content Area */}
         <main className="p-6">
-          {currentView === 'chat' && <ChatView />}
+          {currentView === 'chat' && <ChatView selectedCompanyProfile={selectedCompanyProfile} setSelectedCompanyProfile={setSelectedCompanyProfile} />}
           {currentView === 'search' && <SearchView />}
           {currentView === 'forecast' && <ForecastView />}
           {currentView === 'upload' && <UploadView />}
@@ -259,23 +331,26 @@ export default function Dashboard() {
                   <Button
                     variant={llmConfig.provider === 'openai' ? 'default' : 'outline'}
                     size="sm"
+                    aria-label="OpenAI"
                     onClick={() => setLLMProvider('openai')}
                   >
-                    OpenAI
+                    <OpenAILogo className="h-5 w-5" />
                   </Button>
                   <Button
                     variant={llmConfig.provider === 'anthropic' ? 'default' : 'outline'}
                     size="sm"
+                    aria-label="Anthropic"
                     onClick={() => setLLMProvider('anthropic')}
                   >
-                    Anthropic
+                    <AnthropicLogo className="h-5 w-5" />
                   </Button>
                   <Button
                     variant={llmConfig.provider === 'huggingface' ? 'default' : 'outline'}
                     size="sm"
+                    aria-label="Hugging Face"
                     onClick={() => setLLMProvider('huggingface')}
                   >
-                    Hugging Face
+                    <HuggingFaceLogo className="h-5 w-5" />
                   </Button>
                 </div>
               </div>
@@ -349,23 +424,26 @@ export default function Dashboard() {
                       <Button
                         variant={llmConfig.provider === 'openai' ? 'default' : 'outline'}
                         size="sm"
+                        aria-label="OpenAI"
                         onClick={() => setLLMProvider('openai')}
                       >
-                        OpenAI
+                        <OpenAILogo className="h-5 w-5" />
                       </Button>
                       <Button
                         variant={llmConfig.provider === 'anthropic' ? 'default' : 'outline'}
                         size="sm"
+                        aria-label="Anthropic"
                         onClick={() => setLLMProvider('anthropic')}
                       >
-                        Anthropic
+                        <AnthropicLogo className="h-5 w-5" />
                       </Button>
                       <Button
                         variant={llmConfig.provider === 'huggingface' ? 'default' : 'outline'}
                         size="sm"
+                        aria-label="Hugging Face"
                         onClick={() => setLLMProvider('huggingface')}
                       >
-                        Hugging Face
+                        <HuggingFaceLogo className="h-5 w-5" />
                       </Button>
                     </div>
                   </div>
@@ -461,13 +539,23 @@ export default function Dashboard() {
 }
 
 // Chat View Component
-function ChatView() {
+function ChatView({ 
+  selectedCompanyProfile, 
+  setSelectedCompanyProfile 
+}: { 
+  selectedCompanyProfile: CompanyProfile | null; 
+  setSelectedCompanyProfile: React.Dispatch<React.SetStateAction<CompanyProfile | null>>; 
+}) {
   const [inputMessage, setInputMessage] = useState('');
   const [messages, setMessages] = useState<Array<{role: 'user' | 'assistant', content: string}>>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [showCompanySelector, setShowCompanySelector] = useState(false);
+  
   const llmConfig = useLLMConfig();
+  const companyProfile = useCompanyProfile();
   const prepopulatedMessage = useAppStore((state) => state.prepopulatedMessage);
   const setPrepopulatedMessage = useAppStore((state) => state.setPrepopulatedMessage);
+  const { loadSavedProfiles } = useAppStore();
 
   // Handle prepopulated message
   useEffect(() => {
@@ -476,6 +564,33 @@ function ChatView() {
       setPrepopulatedMessage(null); // Clear the prepopulated message
     }
   }, [prepopulatedMessage, setPrepopulatedMessage]);
+
+  // Set default company profile if available
+  useEffect(() => {
+    if (companyProfile && !selectedCompanyProfile) {
+      setSelectedCompanyProfile(companyProfile);
+    }
+  }, [companyProfile, selectedCompanyProfile]);
+
+  // Load selected company profile from localStorage on mount
+  useEffect(() => {
+    const savedProfileId = localStorage.getItem('opensam-selected-company-profile');
+    if (savedProfileId && !selectedCompanyProfile) {
+      const savedProfile = loadProfile(savedProfileId);
+      if (savedProfile) {
+        setSelectedCompanyProfile(savedProfile);
+      }
+    }
+  }, [selectedCompanyProfile, loadProfile]);
+
+  // Save selected company profile to localStorage when it changes
+  useEffect(() => {
+    if (selectedCompanyProfile) {
+      localStorage.setItem('opensam-selected-company-profile', selectedCompanyProfile.id);
+    } else {
+      localStorage.removeItem('opensam-selected-company-profile');
+    }
+  }, [selectedCompanyProfile]);
 
   const sendMessage = async () => {
     if (!inputMessage.trim() || !llmConfig.apiKey) return;
@@ -495,6 +610,7 @@ function ChatView() {
         body: JSON.stringify({
           model: `${llmConfig.provider}:${llmConfig.model}`,
           messages: [...messages, userMessage],
+          companyProfile: selectedCompanyProfile, // Include selected company profile
           context: {
             temperature: llmConfig.temperature || 0.7,
             maxTokens: llmConfig.maxTokens || 1000
@@ -511,7 +627,8 @@ function ChatView() {
       if (data.success && data.data) {
         const assistantMessage = { 
           role: 'assistant' as const, 
-          content: data.data.content 
+          content: data.data.content,
+          ragContext: data.data.ragContext // Include RAG context if available
         };
         setMessages(prev => [...prev, assistantMessage]);
       } else {
@@ -540,16 +657,90 @@ function ChatView() {
     <div className="max-w-4xl mx-auto">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center">
-            <MessageCircle className="h-5 w-5 mr-2" />
-            AI Chat Assistant
-          </CardTitle>
-          <CardDescription>
-            Ask questions about SAM.gov opportunities, get insights, and explore contract data.
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center">
+                <MessageCircle className="h-5 w-5 mr-2" />
+                AI Chat Assistant
+              </CardTitle>
+              <CardDescription>
+                Ask questions about SAM.gov opportunities, get insights, and explore contract data.
+              </CardDescription>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowCompanySelector(!showCompanySelector)}
+              >
+                {selectedCompanyProfile ? (
+                  <>
+                    <Building className="h-4 w-4 mr-2" />
+                    {selectedCompanyProfile.entityName}
+                  </>
+                ) : (
+                  <>
+                    <Building className="h-4 w-4 mr-2" />
+                    Select Company
+                  </>
+                )}
+              </Button>
+              {selectedCompanyProfile && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedCompanyProfile(null)}
+                  className="text-red-600 hover:text-red-700"
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
+            {/* Company Profile Selector */}
+            {showCompanySelector && (
+              <div className="p-4 border border-opensam-gray-200 rounded-lg bg-opensam-gray-50">
+                <h4 className="font-medium text-opensam-black mb-3">Select Company Profile</h4>
+                <div className="space-y-2">
+                  {loadSavedProfiles().length > 0 ? (
+                    loadSavedProfiles().map((profile: CompanyProfile) => (
+                      <div
+                        key={profile.id}
+                        className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                          selectedCompanyProfile?.id === profile.id
+                            ? 'border-opensam-black bg-opensam-black text-opensam-white'
+                            : 'border-opensam-gray-200 bg-opensam-white hover:border-opensam-gray-300'
+                        }`}
+                        onClick={() => {
+                          setSelectedCompanyProfile(profile);
+                          setShowCompanySelector(false);
+                        }}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium">{profile.entityName || 'Unnamed Company'}</p>
+                            <p className="text-sm opacity-75">
+                              {profile.naicsCodes?.length > 0 ? `NAICS: ${profile.naicsCodes.join(', ')}` : 'No NAICS codes'}
+                            </p>
+                          </div>
+                          {selectedCompanyProfile?.id === profile.id && (
+                            <div className="w-2 h-2 bg-opensam-white rounded-full"></div>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-opensam-gray-600">
+                      No saved company profiles found. Create one in the AI Company Profile section.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="h-96 border border-opensam-gray-200 rounded-lg p-4 bg-opensam-gray-50 overflow-y-auto">
               {messages.length === 0 ? (
                 <div className="flex items-center justify-center h-full text-opensam-gray-500">
@@ -573,6 +764,29 @@ function ChatView() {
                         ) : (
                           <div className="text-sm">
                             <MarkdownRenderer content={message.content} />
+                            {/* Show RAG context if available */}
+                            {(message as any).ragContext && (
+                              <div className="mt-3 p-2 bg-opensam-gray-100 rounded border-l-4 border-opensam-black">
+                                <p className="text-xs font-medium text-opensam-black mb-2">
+                                  📊 Related Opportunities ({(message as any).ragContext.opportunities.length})
+                                </p>
+                                <div className="space-y-1">
+                                  {(message as any).ragContext.opportunities.slice(0, 3).map((item: any, oppIndex: number) => (
+                                    <div key={oppIndex} className="text-xs">
+                                      <p className="font-medium flex items-center">
+                                        {item.opportunity.title}
+                                        <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full text-[10px] font-semibold">
+                                          {item.score}% match
+                                        </span>
+                                      </p>
+                                      <p className="text-opensam-gray-600">
+                                        {item.opportunity.naicsCode}
+                                      </p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -610,6 +824,11 @@ function ChatView() {
             {!llmConfig.apiKey && (
               <p className="text-sm text-red-500 text-center">
                 Please set your API key in the sidebar to start chatting
+              </p>
+            )}
+            {!selectedCompanyProfile && (
+              <p className="text-sm text-blue-600 text-center">
+                💡 Select a company profile above to get personalized opportunity recommendations
               </p>
             )}
           </div>
@@ -704,7 +923,9 @@ function UploadView() {
     setIsCompanyProfileLoading, 
     fetchSAMEntityData, 
     saveCompanyProfile,
-    enhanceCompanyProfile
+    enhanceCompanyProfile,
+    loadSavedProfiles,
+    loadProfile
   } = useAppStore();
 
   // Load existing profile on mount
@@ -887,6 +1108,62 @@ function UploadView() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Profile Selector */}
+          <div className="mb-6 p-4 bg-muted/30 rounded-lg border border-border">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <h4 className="font-medium text-foreground mb-2">Saved Profiles</h4>
+                <p className="text-sm text-muted-foreground">
+                  Load a previously saved company profile or create a new one
+                </p>
+              </div>
+              <div className="flex space-x-2">
+                <select
+                  className="px-3 py-2 border border-border rounded-md bg-background text-foreground text-sm"
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      loadProfile(e.target.value);
+                    }
+                  }}
+                  value=""
+                >
+                  <option value="">Select a saved profile...</option>
+                  {loadSavedProfiles().map((profile: any) => (
+                    <option key={profile.id} value={profile.id}>
+                      {profile.entityName || 'Unnamed Profile'} ({new Date(profile.createdAt).toLocaleDateString()})
+                    </option>
+                  ))}
+                </select>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    // Clear current profile to create new one
+                    setCompanyProfile(null);
+                    setUeiSAM('');
+                    setDescription('');
+                    setBusinessTypes([]);
+                    setNaicsCodes([]);
+                    setCapabilities([]);
+                    setPastPerformance([]);
+                    setCertifications([]);
+                    setContactInfo({
+                      address: '',
+                      city: '',
+                      state: '',
+                      zipCode: '',
+                      phone: '',
+                      email: '',
+                      website: ''
+                    });
+                  }}
+                >
+                  New Profile
+                </Button>
+              </div>
+            </div>
+          </div>
+          
           <div className="space-y-6">
             {/* UEI SAM Section */}
             <div className="space-y-4">

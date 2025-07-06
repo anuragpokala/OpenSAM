@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SAMOpportunity, SAMSearchFilters, SAMSearchResponse, EmbeddingRequest, EmbeddingResponse } from '@/types';
 import { cosineSimilarity } from '@/lib/utils';
-import { vectorStoreUtils } from '@/lib/vectorStore';
 import { withCache, generateCacheKey } from '@/lib/redis';
+import { vectorStoreServerUtils } from '@/lib/vectorStore-server';
 
 // SAM.gov API configuration
 const SAM_BASE_URL = process.env.SAM_BASE_URL || 'https://api.sam.gov';
@@ -475,7 +475,7 @@ export async function GET(req: NextRequest) {
     if (opportunities.length > 0) {
       try {
         await Promise.all(
-          opportunities.slice(0, 10).map(opp => vectorStoreUtils.addOpportunity(opp))
+          opportunities.slice(0, 10).map(opp => vectorStoreServerUtils.addOpportunity(opp))
         );
       } catch (error) {
         console.warn('Failed to add opportunities to vector store:', error);

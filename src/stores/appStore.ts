@@ -186,6 +186,8 @@ interface AppStore extends AppState {
   exportData: () => string;
   importData: (data: string) => void;
         initializeStore: () => Promise<void>;
+  loadSavedProfiles: () => CompanyProfile[];
+  loadProfile: (profileId: string) => CompanyProfile | null;
 }
 
 // Create the store
@@ -600,14 +602,32 @@ export const useAppStore = create<AppStore>()(
           // Update store
           set({ companyProfile: profile });
           
-          // Add to vector store for matching
-          try {
-            const { vectorStoreUtils } = await import('@/lib/vectorStore');
-            await vectorStoreUtils.addCompanyProfile(profile);
-            console.log('✅ Company profile added to vector store');
-          } catch (vectorError) {
-            console.warn('⚠️ Failed to add company profile to vector store:', vectorError);
-            // Don't fail the save operation if vector store is unavailable
+          // Add to vector store for matching (server-side only)
+          if (typeof window === 'undefined') {
+            try {
+              const { vectorStoreServerUtils } = await import('@/lib/vectorStore-server');
+              await vectorStoreServerUtils.addCompanyProfile(profile);
+              console.log('✅ Company profile added to vector store');
+            } catch (vectorError) {
+              console.warn('⚠️ Failed to add company profile to vector store:', vectorError);
+            }
+          } else {
+            // In browser, make API call to add to vector store
+            try {
+              const response = await fetch('/api/company-profile/vectorize', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ profile })
+              });
+              
+              if (response.ok) {
+                console.log('✅ Company profile added to vector store via API');
+              } else {
+                console.warn('⚠️ Failed to add company profile to vector store via API');
+              }
+            } catch (apiError) {
+              console.warn('⚠️ Failed to add company profile to vector store via API:', apiError);
+            }
           }
         } catch (error) {
           console.error('Failed to save company profile:', error);
@@ -755,6 +775,31 @@ export const useAppStore = create<AppStore>()(
           } catch {
             // Ignore decryption errors
           }
+        }
+      },
+
+      loadSavedProfiles: () => {
+        try {
+          const profiles = JSON.parse(localStorage.getItem('opensam-company-profiles') || '{}');
+          return Object.values(profiles);
+        } catch (error) {
+          console.error('Failed to load saved profiles:', error);
+          return [];
+        }
+      },
+
+      loadProfile: (profileId: string) => {
+        try {
+          const profiles = JSON.parse(localStorage.getItem('opensam-company-profiles') || '{}');
+          const profile = profiles[profileId];
+          if (profile) {
+            set({ companyProfile: profile });
+            return profile;
+          }
+          return null;
+        } catch (error) {
+          console.error('Failed to load profile:', error);
+          return null;
         }
       },
     }),

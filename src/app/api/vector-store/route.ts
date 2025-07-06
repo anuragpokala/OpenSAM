@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { vectorStoreUtils } from '@/lib/vectorStore';
+import { vectorStoreServerUtils } from '@/lib/vectorStore-server';
 
 export async function GET(req: NextRequest) {
   try {
@@ -11,12 +11,12 @@ export async function GET(req: NextRequest) {
     switch (action) {
       case 'stats':
         // Get vector store statistics
-        const statsData = await vectorStoreUtils.getStats();
+        const statsData = await vectorStoreServerUtils.getStats();
         return NextResponse.json({ success: true, data: statsData });
 
       case 'collections':
         // List all collections
-        const collectionsList = await vectorStoreUtils.listCollections();
+        const collectionsList = await vectorStoreServerUtils.listCollections();
         return NextResponse.json({ success: true, data: collectionsList });
 
       case 'sample':
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
         try {
           // Create a dummy query vector to get sample results
           const dummyVector = new Array(1536).fill(0.1);
-          const sampleResults = await vectorStoreUtils.searchVectors(
+          const sampleResults = await vectorStoreServerUtils.searchVectors(
             dummyVector, 
             collection, 
             limit
@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
           }, { status: 400 });
         }
 
-        await vectorStoreUtils.deleteCollection(collection);
+        await vectorStoreServerUtils.deleteCollection(collection);
         return NextResponse.json({ 
           success: true, 
           message: `Collection ${collection} deleted successfully` 
@@ -74,8 +74,8 @@ export async function GET(req: NextRequest) {
       default:
         // Default: return comprehensive vector store information
         const [storeStats, storeCollections] = await Promise.all([
-          vectorStoreUtils.getStats(),
-          vectorStoreUtils.listCollections()
+          vectorStoreServerUtils.getStats(),
+          vectorStoreServerUtils.listCollections()
         ]);
 
         // Get sample data from each collection
@@ -83,7 +83,7 @@ export async function GET(req: NextRequest) {
           storeCollections.map(async (col) => {
             try {
               const dummyVector = new Array(1536).fill(0.1);
-              const samples = await vectorStoreUtils.searchVectors(
+              const samples = await vectorStoreServerUtils.searchVectors(
                 dummyVector, 
                 col, 
                 5 // Limit to 5 samples per collection

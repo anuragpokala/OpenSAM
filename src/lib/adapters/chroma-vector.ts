@@ -31,19 +31,32 @@ export class ChromaVectorAdapter implements VectorStoreAdapter {
   async createCollection(collection: string, dimension: number = 1536): Promise<void> {
     try {
       if (this.collections.has(collection)) {
-        return; // Collection already exists
+        return; // Collection already exists in memory
       }
 
-      const chromaCollection = await this.client.createCollection({
-        name: collection,
-        metadata: {
-          dimension: dimension.toString(),
-          description: `Collection for ${collection} vectors`
-        }
-      });
+      // Check if collection already exists in ChromaDB
+      try {
+        const existingCollection = await this.client.getCollection({ name: collection });
+        this.collections.set(collection, existingCollection);
+        console.log(`✅ Found existing ChromaDB collection: ${collection}`);
+        return;
+      } catch (getError: any) {
+        // Collection doesn't exist, create it
+        if (getError.message?.includes('not found') || getError.message?.includes('does not exist')) {
+          const chromaCollection = await this.client.createCollection({
+            name: collection,
+            metadata: {
+              dimension: dimension.toString(),
+              description: `Collection for ${collection} vectors`
+            }
+          });
 
-      this.collections.set(collection, chromaCollection);
-      console.log(`✅ Created ChromaDB collection: ${collection}`);
+          this.collections.set(collection, chromaCollection);
+          console.log(`✅ Created ChromaDB collection: ${collection}`);
+        } else {
+          throw getError;
+        }
+      }
     } catch (error) {
       console.error(`❌ Failed to create collection ${collection}:`, error);
       throw error;
