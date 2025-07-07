@@ -5,11 +5,13 @@ import { vectorStoreServerUtils } from '@/lib/vectorStore-server';
 /**
  * Match company profile with opportunities
  * GET /api/match?company_id=xxx&limit=5
+ * POST /api/match (with company profile in body)
  */
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const companyId = searchParams.get('company_id');
+    const opportunityId = searchParams.get('opportunity_id');
     const limit = parseInt(searchParams.get('limit') || '5');
     const query = searchParams.get('query'); // Optional text query
 
@@ -19,17 +21,61 @@ export async function GET(req: NextRequest) {
       }, { status: 400 });
     }
 
-    // Get company profile from localStorage (simplified - in production, use database)
-    let companyProfile = null;
-    if (typeof window !== 'undefined') {
-      const profiles = JSON.parse(localStorage.getItem('opensam-company-profiles') || '{}');
-      companyProfile = profiles[companyId];
+    // For GET requests, we need the company profile data to be passed in the request body
+    // This is a limitation since GET requests shouldn't have bodies, so we'll return an error
+    // suggesting to use POST instead
+    return NextResponse.json({ 
+      error: 'Company profile data required. Please use POST method with company profile in request body.' 
+    }, { status: 400 });
+
+  } catch (error) {
+    console.error('Match API error:', error);
+    
+    return NextResponse.json({ 
+      error: 'Failed to match opportunities',
+      details: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: Date.now()
+    }, { status: 500 });
+  }
+}
+
+/**
+ * Match company profile with opportunities (POST method)
+ * POST /api/match
+ * Body: { companyProfile: CompanyProfile, opportunityId?: string, limit?: number, query?: string }
+ */
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { companyProfile, opportunityId, limit = 5, query } = body;
+
+    if (!companyProfile || !companyProfile.id) {
+      return NextResponse.json({ 
+        error: 'Company profile with ID is required in request body' 
+      }, { status: 400 });
     }
 
-    if (!companyProfile) {
-      return NextResponse.json({ 
-        error: 'Company profile not found' 
-      }, { status: 404 });
+    // If opportunity_id is provided, calculate match for specific opportunity
+    if (opportunityId) {
+      try {
+        const matchScore = await vectorStoreServerUtils.calculateOpportunityMatch(companyProfile, opportunityId);
+        return NextResponse.json({
+          success: true,
+          data: {
+            companyId: companyProfile.id,
+            opportunityId,
+            matchScore,
+            timestamp: Date.now()
+          }
+        }, { status: 200 });
+      } catch (error) {
+        console.error('Opportunity match calculation error:', error);
+        return NextResponse.json({ 
+          error: 'Failed to calculate opportunity match',
+          details: error instanceof Error ? error.message : 'Unknown error',
+          timestamp: Date.now()
+        }, { status: 500 });
+      }
     }
 
     let results: Array<{ opportunity: any; score: number }> = [];
@@ -64,13 +110,13 @@ export async function GET(req: NextRequest) {
       }));
     } else {
       // Profile-based matching: find opportunities similar to company profile
-              results = await vectorStoreServerUtils.findMatchingOpportunities(companyProfile, limit);
+      results = await vectorStoreServerUtils.findMatchingOpportunities(companyProfile, limit);
     }
 
     return NextResponse.json({
       success: true,
       data: {
-        companyId,
+        companyId: companyProfile.id,
         query: query || null,
         results,
         totalResults: results.length,
@@ -83,42 +129,6 @@ export async function GET(req: NextRequest) {
     
     return NextResponse.json({ 
       error: 'Failed to match opportunities',
-      details: error instanceof Error ? error.message : 'Unknown error',
-      timestamp: Date.now()
-    }, { status: 500 });
-  }
-}
-
-/**
- * Add company profile to vector store
- * POST /api/match
- */
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    const { companyProfile, embeddingConfig } = body;
-
-    if (!companyProfile || !companyProfile.id) {
-      return NextResponse.json({ 
-        error: 'Company profile with ID is required' 
-      }, { status: 400 });
-    }
-
-    // Add company profile to vector store
-          await vectorStoreServerUtils.addCompanyProfile(companyProfile, embeddingConfig);
-
-    return NextResponse.json({
-      success: true,
-      message: 'Company profile added to vector store',
-      profileId: companyProfile.id,
-      timestamp: Date.now()
-    }, { status: 200 });
-
-  } catch (error) {
-    console.error('Add company profile error:', error);
-    
-    return NextResponse.json({ 
-      error: 'Failed to add company profile to vector store',
       details: error instanceof Error ? error.message : 'Unknown error',
       timestamp: Date.now()
     }, { status: 500 });

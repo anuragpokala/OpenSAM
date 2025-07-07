@@ -81,11 +81,11 @@ function formatCompanyProfile(profile: CompanyProfile): string {
   const sections = [
     `Company: ${profile.entityName}`,
     `Description: ${profile.description}`,
-    `NAICS Codes: ${profile.naicsCodes.join(', ')}`,
-    `Capabilities: ${profile.capabilities.join(', ')}`,
-    `Business Types: ${profile.businessTypes.join(', ')}`,
-    `Past Performance: ${profile.pastPerformance.join('; ')}`,
-    `Certifications: ${profile.certifications.join(', ')}`
+    `NAICS Codes: ${profile.naicsCodes?.join(', ') || 'None'}`,
+    `Capabilities: ${profile.capabilities?.join(', ') || 'None'}`,
+    `Business Types: ${profile.businessTypes?.join(', ') || 'None'}`,
+    `Past Performance: ${profile.pastPerformance?.join('; ') || 'None'}`,
+    `Certifications: ${profile.certifications?.join(', ') || 'None'}`
   ];
 
   // Add AI-enhanced information if available
@@ -94,9 +94,9 @@ function formatCompanyProfile(profile: CompanyProfile): string {
       `Industry: ${profile.aiEnhanced.industry}`,
       `Company Size: ${profile.aiEnhanced.companySize}`,
       `Enhanced Description: ${profile.aiEnhanced.enhancedDescription}`,
-      `Key Products: ${profile.aiEnhanced.keyProducts.join(', ')}`,
-      `Target Markets: ${profile.aiEnhanced.targetMarkets.join(', ')}`,
-      `Competitive Advantages: ${profile.aiEnhanced.competitiveAdvantages.join(', ')}`
+      `Key Products: ${profile.aiEnhanced.keyProducts?.join(', ') || 'None'}`,
+      `Target Markets: ${profile.aiEnhanced.targetMarkets?.join(', ') || 'None'}`,
+      `Competitive Advantages: ${profile.aiEnhanced.competitiveAdvantages?.join(', ') || 'None'}`
     );
   }
 
@@ -272,21 +272,21 @@ export function analyzeOpportunityFit(
   overallScore: number;
 } {
   // NAICS code match
-  const naicsMatch = companyProfile.naicsCodes.includes(opportunity.naicsCode);
+  const naicsMatch = companyProfile.naicsCodes?.includes(opportunity.naicsCode) || false;
   
   // Set-aside match
-  const setAsideMatch = companyProfile.businessTypes.some(type => 
+  const setAsideMatch = companyProfile.businessTypes?.some(type => 
     opportunity.typeOfSetAsideDescription?.toLowerCase().includes(type.toLowerCase())
-  );
+  ) || false;
   
   // Location match (simplified - could be enhanced with distance calculation)
-  const locationMatch = opportunity.placeOfPerformance?.state?.name === companyProfile.contactInfo.state;
+  const locationMatch = opportunity.placeOfPerformance?.state?.name === companyProfile.contactInfo?.state;
   
   // Capability match (simple keyword matching)
   const opportunityText = `${opportunity.title} ${opportunity.synopsis}`.toLowerCase();
-  const capabilityMatch = companyProfile.capabilities.some(capability =>
+  const capabilityMatch = companyProfile.capabilities?.some(capability =>
     opportunityText.includes(capability.toLowerCase())
-  );
+  ) || false;
   
   // Calculate overall score
   const scores = [naicsMatch, setAsideMatch, locationMatch, capabilityMatch];

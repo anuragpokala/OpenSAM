@@ -15,7 +15,11 @@ import {
   FileText,
   Sparkles,
   List,
-  CheckCircle
+  CheckCircle,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  Hash
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,9 +35,12 @@ import {
   useSearchFilters, 
   useVectorSearchResults,
   useWorkingLists,
-  useCurrentWorkingList
+  useCurrentWorkingList,
+  useCompanyProfile,
+  useLLMConfig
 } from '@/stores/appStore';
 import { SAMOpportunity, WorkingList, WorkingListItem } from '@/types';
+import { NAICS_CODES, OPPORTUNITY_TYPES, getNAICSCodesByIndustry, getOpportunityTypesByCategory } from '@/lib/naics-mapping';
 
 // Custom icon components
 const Shield = ({ className }: { className?: string }) => (
@@ -72,47 +79,69 @@ const AlertTriangle = ({ className }: { className?: string }) => (
   </svg>
 );
 
-// Preset search queries for quick access
+// Preset search queries for quick access using NAICS codes
 const PRESET_QUERIES = [
   {
-    id: 'ai-software',
-    label: 'AI & Software Development',
-    query: 'artificial intelligence software development',
-    description: 'Find AI and software development contracts',
+    id: 'it-software',
+    label: 'IT & Software Development',
+    naicsCodes: ['541511', '541512', '541519'],
+    opportunityTypes: ['Solicitation', 'Request for Proposal (RFP)', 'Combined Synopsis/Solicitation'],
+    description: 'Find IT and software development contracts using NAICS codes',
     icon: Sparkles
   },
   {
     id: 'cybersecurity',
-    label: 'Cybersecurity',
-    query: 'cybersecurity information security',
+    label: 'Cybersecurity & Information Security',
+    naicsCodes: ['541511', '541512', '541519', '561621'],
+    opportunityTypes: ['Solicitation', 'Request for Proposal (RFP)'],
     description: 'Cybersecurity and information security opportunities',
     icon: Shield
   },
   {
-    id: 'construction',
-    label: 'Construction & Infrastructure',
-    query: 'construction infrastructure building',
-    description: 'Construction and infrastructure projects',
-    icon: Building
-  },
-  {
     id: 'healthcare',
     label: 'Healthcare & Medical',
-    query: 'healthcare medical services',
+    naicsCodes: ['621111', '621210', '621310', '621511', '621512'],
+    opportunityTypes: ['Solicitation', 'Request for Proposal (RFP)'],
     description: 'Healthcare and medical service contracts',
     icon: Heart
   },
   {
+    id: 'construction',
+    label: 'Construction & Infrastructure',
+    naicsCodes: ['236220', '237310', '238110', '238210'],
+    opportunityTypes: ['Solicitation', 'Invitation for Bid (IFB)'],
+    description: 'Construction and infrastructure projects',
+    icon: Building
+  },
+  {
+    id: 'manufacturing',
+    label: 'Manufacturing & Engineering',
+    naicsCodes: ['332997', '333611', '333612', '333613'],
+    opportunityTypes: ['Solicitation', 'Request for Quote (RFQ)'],
+    description: 'Manufacturing and engineering contracts',
+    icon: Target
+  },
+  {
+    id: 'professional-services',
+    label: 'Professional Services',
+    naicsCodes: ['541611', '541612', '541613', '541614'],
+    opportunityTypes: ['Solicitation', 'Request for Proposal (RFP)'],
+    description: 'Professional and consulting services',
+    icon: Users
+  },
+  {
     id: 'small-business',
     label: 'Small Business Set-Asides',
-    query: 'small business set-aside',
+    naicsCodes: [],
+    opportunityTypes: ['Small Business Set-Aside', '8(a) Business Development Program'],
     description: 'Small business set-aside opportunities',
     icon: Users
   },
   {
-    id: 'research',
+    id: 'research-development',
     label: 'Research & Development',
-    query: 'research development R&D',
+    naicsCodes: ['541715', '541720'],
+    opportunityTypes: ['Research and Development', 'Innovation'],
     description: 'Research and development contracts',
     icon: Microscope
   }
@@ -152,21 +181,113 @@ const PRESET_MESSAGES = [
   }
 ];
 
+// Pagination component
+function Pagination({ 
+  currentPage, 
+  totalPages, 
+  onPageChange, 
+  totalResults,
+  resultsPerPage 
+}: {
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+  totalResults: number;
+  resultsPerPage: number;
+}) {
+  const startResult = (currentPage - 1) * resultsPerPage + 1;
+  const endResult = Math.min(currentPage * resultsPerPage, totalResults);
 
+  return (
+    <div className="flex items-center justify-between px-4 py-3 bg-white border-t border-gray-200 sm:px-6">
+      <div className="flex items-center text-sm text-gray-700">
+        <span>
+          Showing {startResult} to {endResult} of {totalResults} results
+        </span>
+      </div>
+      
+      <div className="flex items-center space-x-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage <= 1}
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Previous
+        </Button>
+        
+        <div className="flex items-center space-x-1">
+          {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+            let pageNum;
+            if (totalPages <= 5) {
+              pageNum = i + 1;
+            } else if (currentPage <= 3) {
+              pageNum = i + 1;
+            } else if (currentPage >= totalPages - 2) {
+              pageNum = totalPages - 4 + i;
+            } else {
+              pageNum = currentPage - 2 + i;
+            }
+            
+            return (
+              <Button
+                key={pageNum}
+                variant={currentPage === pageNum ? "default" : "outline"}
+                size="sm"
+                onClick={() => onPageChange(pageNum)}
+                className="w-8 h-8 p-0"
+              >
+                {pageNum}
+              </Button>
+            );
+          })}
+        </div>
+        
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage >= totalPages}
+        >
+          Next
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 export default function SearchView() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [titleSearch, setTitleSearch] = useState('');
+  const [naicsSearch, setNaicsSearch] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [showPresets, setShowPresets] = useState(false);
   const [showWorkingLists, setShowWorkingLists] = useState(false);
+  const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
   const [selectedOpportunities, setSelectedOpportunities] = useState<string[]>([]);
   const [newWorkingListName, setNewWorkingListName] = useState('');
+  const [opportunityMatches, setOpportunityMatches] = useState<Record<string, number>>({});
+  const [loadingMatches, setLoadingMatches] = useState<Set<string>>(new Set());
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [resultsPerPage, setResultsPerPage] = useState(20);
+  const [totalResults, setTotalResults] = useState(0);
+  
+  // Date filters state
+  const [advancedFilters, setAdvancedFilters] = useState({
+    startDate: '',
+    endDate: ''
+  });
   
   const searchResults = useSearchResults();
   const searchFilters = useSearchFilters();
-  const vectorResults = useVectorSearchResults();
   const workingLists = useWorkingLists();
   const currentWorkingList = useCurrentWorkingList();
+  const companyProfile = useCompanyProfile();
+  const llmConfig = useLLMConfig();
   
   const {
     setSearchQuery: setStoreSearchQuery,
@@ -176,7 +297,6 @@ export default function SearchView() {
     addToFavorites,
     removeFromFavorites,
     toggleFavorite,
-    performVectorSearch,
     createWorkingList,
     addItemToWorkingList,
     setCurrentWorkingList,
@@ -189,14 +309,16 @@ export default function SearchView() {
     lastSearchTimestamp,
     cacheNotificationDismissed,
     // State
-    isSearching,
-    isVectorSearching
+    isSearching
   } = useAppStore();
 
-  // Perform search
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) return;
-    
+  // Reset pagination when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, titleSearch, naicsSearch, advancedFilters]);
+
+  // Perform search with enhanced filters and pagination
+  const performSearch = async (page: number = 1) => {
     // Check if SAM API key is configured
     const samApiKey = process.env.NEXT_PUBLIC_SAM_API_KEY;
     if (!samApiKey) {
@@ -206,10 +328,9 @@ export default function SearchView() {
     
     setIsSearching(true);
     try {
-      // Set default date range if not provided (last 30 days)
+      // Set default date range if not provided (current year for better results)
       const today = new Date();
-      const thirtyDaysAgo = new Date(today);
-      thirtyDaysAgo.setDate(today.getDate() - 30);
+      const startOfYear = new Date(today.getFullYear(), 0, 1); // January 1st of current year
       
       // Format dates as MM/dd/yyyy for SAM.gov API
       const formatDateForSAM = (date: Date) => {
@@ -243,44 +364,46 @@ export default function SearchView() {
         return undefined;
       };
       
-      const startDate = normalizeDate(searchFilters.startDate) || formatDateForSAM(thirtyDaysAgo);
-      const endDate = normalizeDate(searchFilters.endDate) || formatDateForSAM(today);
+      const startDate = normalizeDate(advancedFilters.startDate) || formatDateForSAM(startOfYear);
+      const endDate = normalizeDate(advancedFilters.endDate) || formatDateForSAM(today);
       
-      // Perform regular SAM.gov search
+      // Build search parameters
       const params = new URLSearchParams({
-        q: searchQuery,
         startDate: startDate,
         endDate: endDate,
-        limit: '50',
+        limit: resultsPerPage.toString(),
+        offset: ((page - 1) * resultsPerPage).toString(),
         samApiKey: samApiKey
       });
+      
+      // Add title search if provided
+      if (titleSearch.trim()) {
+        params.append('q', titleSearch.trim());
+      }
+      
+      // Add NAICS codes if provided
+      if (naicsSearch.trim()) {
+        const naicsCodes = naicsSearch.split(',').map(code => code.trim()).filter(code => code);
+        naicsCodes.forEach(code => {
+          params.append('naicsCode', code);
+        });
+      }
+      
+
       
       const response = await fetch(`/api/sam-search?${params.toString()}`);
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
           setSearchResults(data.data.opportunities);
+          setTotalResults(data.data.totalRecords || data.data.opportunities.length);
+          setCurrentPage(page);
+          
           // Track cache status
           setLastSearchCached(data.cached || false, data.timestamp);
           // Reset cache notification dismissal for new searches
           if (data.cached && cacheNotificationDismissed) {
             useAppStore.setState({ cacheNotificationDismissed: false });
-          }
-          
-          // Add opportunities to vector store for future matching (server-side only)
-          if (typeof window === 'undefined') {
-            try {
-              const { vectorStoreUtils } = await import('@/lib/vectorStore');
-              for (const opportunity of data.data.opportunities) {
-                await vectorStoreUtils.addOpportunity(opportunity);
-              }
-              console.log(`✅ Added ${data.data.opportunities.length} opportunities to vector store`);
-            } catch (vectorError) {
-              console.warn('⚠️ Failed to add opportunities to vector store:', vectorError);
-              // Don't fail the search if vector store is unavailable
-            }
-          } else {
-            console.log('ℹ️ Vector store operations skipped in browser environment');
           }
         } else {
           console.error('Search API error:', data.error);
@@ -292,8 +415,9 @@ export default function SearchView() {
         alert(`Search failed: ${errorData.error || 'Unknown error'}`);
       }
       
-      // Perform vector search for additional context
-      await performVectorSearch(searchQuery);
+      // Clear any existing opportunity matches when performing new search
+      setOpportunityMatches({});
+      setLoadingMatches(new Set());
       
     } catch (error) {
       console.error('Search error:', error);
@@ -303,11 +427,33 @@ export default function SearchView() {
     }
   };
 
+  // Handle search button click
+  const handleSearch = () => {
+    performSearch(1);
+  };
+
+  // Handle page change
+  const handlePageChange = (page: number) => {
+    performSearch(page);
+  };
+
   // Handle preset query selection
   const handlePresetQuery = (preset: typeof PRESET_QUERIES[0]) => {
-    setSearchQuery(preset.query);
-    setStoreSearchQuery(preset.query);
-    handleSearch();
+    // Set NAICS codes (take the first one for simplicity)
+    setNaicsSearch(preset.naicsCodes[0] || '');
+    
+    // Build a descriptive search query for display
+    const queryParts = [];
+    if (preset.naicsCodes.length > 0) {
+      queryParts.push(`NAICS: ${preset.naicsCodes[0]}`);
+    }
+    
+    const displayQuery = queryParts.join(' | ');
+    setSearchQuery(displayQuery);
+    setStoreSearchQuery(displayQuery);
+    
+    // Perform search
+    setTimeout(() => performSearch(1), 100);
   };
 
   // Handle preset message for chat
@@ -391,6 +537,77 @@ ${preset.message}`;
     setSelectedOpportunities([]);
   };
 
+  // Calculate company profile match for an opportunity
+  const calculateCompanyMatch = async (opportunityId: string) => {
+    if (!companyProfile || loadingMatches.has(opportunityId) || opportunityMatches[opportunityId] !== undefined) {
+      return;
+    }
+
+    setLoadingMatches(prev => new Set(prev).add(opportunityId));
+    
+    try {
+      const response = await fetch('/api/match', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          companyProfile,
+          opportunityId
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.data.matchScore !== undefined) {
+          setOpportunityMatches(prev => ({
+            ...prev,
+            [opportunityId]: data.data.matchScore
+          }));
+        }
+      }
+    } catch (error) {
+      console.error('Failed to calculate company match:', error);
+    } finally {
+      setLoadingMatches(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(opportunityId);
+        return newSet;
+      });
+    }
+  };
+
+  // Clear all filters
+  const clearFilters = () => {
+    setTitleSearch('');
+    setNaicsSearch('');
+    setAdvancedFilters({
+      startDate: '',
+      endDate: ''
+    });
+    setSearchQuery('');
+    setStoreSearchQuery('');
+  };
+
+  // Check if any filters are active
+  const hasActiveFilters = titleSearch || naicsSearch || 
+    Object.values(advancedFilters).some(value => value !== '');
+
+  // Test function to verify search functionality
+  const testSearch = async () => {
+    console.log('🧪 Testing search functionality...');
+    
+    // Test title search
+    setTitleSearch('software development');
+    setNaicsSearch('541511');
+    
+    // Perform test search
+    setTimeout(() => {
+      performSearch(1);
+      console.log('✅ Test search initiated');
+    }, 100);
+  };
+
   return (
     <div className="max-w-7xl mx-auto space-y-6 p-6">
       {/* Search Header */}
@@ -398,10 +615,10 @@ ${preset.message}`;
         <CardHeader>
           <CardTitle className="flex items-center">
             <Search className="h-5 w-5 mr-2" />
-            SAM.gov Search
+            Enhanced SAM.gov Search
           </CardTitle>
           <CardDescription>
-            Search for government contracting opportunities with AI-powered semantic search
+            Search for government contracting opportunities using SAM.gov API with title search and NAICS codes
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -410,16 +627,54 @@ ${preset.message}`;
             <div className="flex space-x-2">
               <div className="relative flex-1">
                 <Input
-                  placeholder="Search for opportunities... (e.g., 'AI software development contracts')"
+                  placeholder="Search by title or keywords... (e.g., 'software development', 'AI services')"
                   className="flex-1"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  value={titleSearch}
+                  onChange={(e) => {
+                    setTitleSearch(e.target.value);
+                    setShowSearchSuggestions(e.target.value.length > 0);
+                  }}
+                  onFocus={() => setShowSearchSuggestions(titleSearch.length > 0)}
+                  onBlur={() => setTimeout(() => setShowSearchSuggestions(false), 200)}
                   onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                   disabled={isSearching}
                 />
                 {isSearching && (
                   <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
                     <ButtonSpinner size="sm" />
+                  </div>
+                )}
+                
+                {/* Search Suggestions */}
+                {showSearchSuggestions && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+                    <div className="p-2">
+                      <div className="text-xs font-medium text-muted-foreground mb-2 px-2">Search Suggestions</div>
+                      {PRESET_QUERIES
+                        .filter(preset => 
+                          preset.label.toLowerCase().includes(titleSearch.toLowerCase()) ||
+                          preset.description.toLowerCase().includes(titleSearch.toLowerCase())
+                        )
+                        .slice(0, 5)
+                        .map((preset) => (
+                          <div
+                            key={preset.id}
+                            className="p-2 rounded cursor-pointer hover:bg-muted transition-colors"
+                            onClick={() => {
+                              setShowSearchSuggestions(false);
+                              handlePresetQuery(preset);
+                            }}
+                          >
+                            <div className="flex items-center space-x-2">
+                              <preset.icon className="h-4 w-4 text-blue-600" />
+                              <div>
+                                <p className="font-medium text-sm">{preset.label}</p>
+                                <p className="text-xs text-muted-foreground">{preset.description}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -438,6 +693,21 @@ ${preset.message}`;
               </Button>
             </div>
 
+            {/* NAICS Code Search */}
+            <div className="flex space-x-2">
+              <div className="relative flex-1">
+                <Hash className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="NAICS code (e.g., 541511, 518210)"
+                  className="flex-1 pl-10"
+                  value={naicsSearch}
+                  onChange={(e) => setNaicsSearch(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                  disabled={isSearching}
+                />
+              </div>
+            </div>
+
             {/* Action Buttons */}
             <div className="flex flex-wrap gap-2">
               <Button 
@@ -447,7 +717,7 @@ ${preset.message}`;
                 disabled={isSearching}
               >
                 <Filter className="h-4 w-4 mr-2" />
-                Filters
+                Date Range
               </Button>
               
               <Button 
@@ -470,6 +740,18 @@ ${preset.message}`;
                 Working Lists
               </Button>
               
+              {hasActiveFilters && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={clearFilters}
+                  disabled={isSearching}
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Clear Filters
+                </Button>
+              )}
+              
               <Button variant="outline" size="sm" disabled={isSearching}>
                 <Star className="h-4 w-4 mr-2" />
                 Favorites
@@ -479,22 +761,35 @@ ${preset.message}`;
                 <Download className="h-4 w-4 mr-2" />
                 Export
               </Button>
+              
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={testSearch}
+                disabled={isSearching}
+              >
+                🧪 Test Search
+              </Button>
             </div>
 
-            {/* Filters Panel */}
+            {/* Date Range Filters */}
             {showFilters && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border rounded-lg bg-gray-50">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-lg bg-gray-50">
                 <div>
-                  <label className="text-sm font-medium">NAICS Code</label>
-                  <Input placeholder="e.g., 541511" />
+                  <label className="text-sm font-medium">Start Date</label>
+                  <Input 
+                    type="date" 
+                    value={advancedFilters.startDate}
+                    onChange={(e) => setAdvancedFilters(prev => ({ ...prev, startDate: e.target.value }))}
+                  />
                 </div>
                 <div>
-                  <label className="text-sm font-medium">State</label>
-                  <Input placeholder="e.g., VA, DC, MD" />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Agency</label>
-                  <Input placeholder="e.g., Department of Defense" />
+                  <label className="text-sm font-medium">End Date</label>
+                  <Input 
+                    type="date" 
+                    value={advancedFilters.endDate}
+                    onChange={(e) => setAdvancedFilters(prev => ({ ...prev, endDate: e.target.value }))}
+                  />
                 </div>
               </div>
             )}
@@ -610,9 +905,14 @@ ${preset.message}`;
           
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <h2 className="text-xl font-semibold">
-                Search Results ({searchResults.length})
-              </h2>
+              <div>
+                <h2 className="text-xl font-semibold">
+                  Search Results ({totalResults})
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Showing {((currentPage - 1) * resultsPerPage) + 1} to {Math.min(currentPage * resultsPerPage, totalResults)} of {totalResults} opportunities
+                </p>
+              </div>
               {lastSearchCached && (
                 <CacheIndicator
                   cached={lastSearchCached}
@@ -651,68 +951,25 @@ ${preset.message}`;
                 onAddToWorkingList={() => handleAddToWorkingList(opportunity)}
                 onToggleFavorite={() => toggleFavorite(opportunity.id)}
                 onPresetMessage={(preset) => handlePresetMessage(preset, opportunity)}
+                companyProfile={companyProfile}
+                opportunityMatches={opportunityMatches}
+                loadingMatches={loadingMatches}
+                calculateCompanyMatch={calculateCompanyMatch}
               />
             ))}
           </div>
-        </div>
-      )}
 
-      {/* Vector Search Results */}
-      {isVectorSearching && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Sparkles className="h-5 w-5 mr-2" />
-              Related Content
-            </CardTitle>
-            <CardDescription>
-              AI-powered semantic search results from your stored data
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-8">
-            <LoadingSpinner 
-              size="md" 
-              text="Finding related content..." 
-              variant="default"
+          {/* Pagination */}
+          {totalResults > resultsPerPage && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={Math.ceil(totalResults / resultsPerPage)}
+              onPageChange={handlePageChange}
+              totalResults={totalResults}
+              resultsPerPage={resultsPerPage}
             />
-          </CardContent>
-        </Card>
-      )}
-      
-      {vectorResults.length > 0 && !isVectorSearching && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Sparkles className="h-5 w-5 mr-2" />
-              Related Content
-            </CardTitle>
-            <CardDescription>
-              AI-powered semantic search results from your stored data
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {vectorResults.slice(0, 5).map((result, index) => (
-                <div key={index} className="p-4 border rounded-lg">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-medium">{result.document.metadata.title}</h4>
-                    <Badge variant="outline">
-                      {Math.round(result.score * 100)}% match
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-gray-600 mb-2">
-                    {result.document.metadata.description}
-                  </p>
-                  {result.highlights && result.highlights.length > 0 && (
-                    <div className="text-xs text-gray-500">
-                      <strong>Highlights:</strong> {result.highlights.join('... ')}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+          )}
+        </div>
       )}
 
       {/* Empty State */}
@@ -722,12 +979,18 @@ ${preset.message}`;
             <Search className="h-12 w-12 mx-auto mb-4 text-gray-400" />
             <h3 className="text-lg font-medium mb-2">No search results yet</h3>
             <p className="text-gray-600 mb-4">
-              Enter a search query to find relevant opportunities
+              Enter a title search or NAICS codes to find relevant opportunities
             </p>
-            <Button onClick={() => setShowPresets(true)}>
-              <Sparkles className="h-4 w-4 mr-2" />
-              Try Preset Queries
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-2 justify-center">
+              <Button onClick={() => setShowPresets(true)}>
+                <Sparkles className="h-4 w-4 mr-2" />
+                Try Preset Queries
+              </Button>
+              <Button variant="outline" onClick={() => setShowFilters(true)}>
+                <Filter className="h-4 w-4 mr-2" />
+                Advanced Filters
+              </Button>
+            </div>
             
             {/* API Key Setup Notice */}
             {!process.env.NEXT_PUBLIC_SAM_API_KEY && (
@@ -760,7 +1023,11 @@ function OpportunityCard({
   onToggleSelection, 
   onAddToWorkingList, 
   onToggleFavorite,
-  onPresetMessage 
+  onPresetMessage,
+  companyProfile,
+  opportunityMatches,
+  loadingMatches,
+  calculateCompanyMatch
 }: {
   opportunity: SAMOpportunity;
   isSelected: boolean;
@@ -768,6 +1035,10 @@ function OpportunityCard({
   onAddToWorkingList: () => void;
   onToggleFavorite: () => void;
   onPresetMessage: (preset: typeof PRESET_MESSAGES[0]) => void;
+  companyProfile: any;
+  opportunityMatches: Record<string, number>;
+  loadingMatches: Set<string>;
+  calculateCompanyMatch: (opportunityId: string) => void;
 }) {
   return (
     <Card className={`${isSelected ? 'ring-2 ring-blue-500' : ''}`}>
@@ -798,6 +1069,39 @@ function OpportunityCard({
                   <CheckCircle className="h-3 w-3 mr-1" />
                   Active
                 </Badge>
+              )}
+              {/* Company Profile Match */}
+              {companyProfile && (
+                <div className="flex items-center space-x-2">
+                  {loadingMatches.has(opportunity.id) ? (
+                    <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 mr-1"></div>
+                      Calculating...
+                    </Badge>
+                  ) : opportunityMatches[opportunity.id] !== undefined ? (
+                    <Badge 
+                      variant="outline" 
+                      className={`${
+                        opportunityMatches[opportunity.id] >= 0.8 
+                          ? 'bg-green-50 text-green-700 border-green-200' 
+                          : opportunityMatches[opportunity.id] >= 0.6 
+                          ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
+                          : 'bg-red-50 text-red-700 border-red-200'
+                      }`}
+                    >
+                      {Math.round(opportunityMatches[opportunity.id] * 100)}% Match
+                    </Badge>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => calculateCompanyMatch(opportunity.id)}
+                      className="h-6 px-2 text-xs"
+                    >
+                      Calculate Match
+                    </Button>
+                  )}
+                </div>
               )}
             </div>
             

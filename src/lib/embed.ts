@@ -66,25 +66,40 @@ export class EmbeddingService {
       throw new Error('OpenAI API key required for embeddings');
     }
 
-    const response = await fetch('https://api.openai.com/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.config.apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        input: text,
-        model: this.config.model || 'text-embedding-3-small',
-      }),
+    console.log('🔍 OpenAI embedding request:', {
+      textLength: text.length,
+      model: this.config.model,
+      hasApiKey: !!this.config.apiKey
     });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(`OpenAI Embeddings API error: ${error.error?.message || response.statusText}`);
-    }
+    try {
+      const response = await fetch('https://api.openai.com/v1/embeddings', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.config.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          input: text,
+          model: this.config.model || 'text-embedding-3-small',
+        }),
+      });
 
-    const data = await response.json();
-    return data.data[0].embedding;
+      console.log('🔍 OpenAI response status:', response.status);
+
+      if (!response.ok) {
+        const error = await response.json();
+        console.error('❌ OpenAI API error:', error);
+        throw new Error(`OpenAI Embeddings API error: ${error.error?.message || response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ OpenAI embedding generated successfully');
+      return data.data[0].embedding;
+    } catch (error) {
+      console.error('❌ OpenAI embedding failed:', error);
+      throw error;
+    }
   }
 
   /**
@@ -141,6 +156,13 @@ export function getEmbeddingService(config?: EmbeddingConfig): EmbeddingService 
       apiKey: process.env.NEXT_PUBLIC_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
       model: 'text-embedding-3-small'
     };
+    
+    console.log('🔍 Embedding service config:', {
+      provider: defaultConfig.provider,
+      model: defaultConfig.model,
+      hasApiKey: !!defaultConfig.apiKey,
+      apiKeyLength: defaultConfig.apiKey?.length || 0
+    });
     
     defaultEmbeddingService = new EmbeddingService(config || defaultConfig);
   }

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SAMOpportunity, SAMSearchFilters, SAMSearchResponse, EmbeddingRequest, EmbeddingResponse } from '@/types';
-import { cosineSimilarity } from '@/lib/utils';
+import { SAMOpportunity, SAMSearchFilters, SAMSearchResponse } from '@/types';
 import { withCache, generateCacheKey } from '@/lib/redis';
 import { vectorStoreServerUtils } from '@/lib/vectorStore-server';
 
@@ -13,8 +12,7 @@ const SAM_RATE_LIMIT_WINDOW = 60000; // 1 minute
 const SAM_RATE_LIMIT_MAX_REQUESTS = 100;
 const samRateLimitMap = new Map<string, { count: number; timestamp: number }>();
 
-// Cache for embeddings and search results
-const embeddingCache = new Map<string, number[]>();
+// Cache for search results
 const searchResultsCache = new Map<string, { data: SAMSearchResponse; timestamp: number }>();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
@@ -48,87 +46,7 @@ function checkSAMRateLimit(req: NextRequest): boolean {
   return true;
 }
 
-/**
- * Generate embeddings for text using the configured LLM provider
- */
-async function generateEmbeddings(text: string, provider: string = 'openai', apiKey: string): Promise<number[]> {
-  // Check cache first
-  const cacheKey = `${provider}:${text}`;
-  if (embeddingCache.has(cacheKey)) {
-    return embeddingCache.get(cacheKey)!;
-  }
-  
-  let embeddings: number[];
-  
-  switch (provider) {
-    case 'openai':
-      embeddings = await generateOpenAIEmbeddings(text, apiKey);
-      break;
-    case 'huggingface':
-      embeddings = await generateHuggingFaceEmbeddings(text, apiKey);
-      break;
-    default:
-      throw new Error(`Embedding provider ${provider} not supported`);
-  }
-  
-  // Cache the result
-  embeddingCache.set(cacheKey, embeddings);
-  
-  return embeddings;
-}
 
-/**
- * Generate embeddings using OpenAI API
- */
-async function generateOpenAIEmbeddings(text: string, apiKey: string): Promise<number[]> {
-  const response = await fetch('https://api.openai.com/v1/embeddings', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'text-embedding-3-small',
-      input: text,
-      encoding_format: 'float',
-    }),
-  });
-  
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(`OpenAI Embeddings API error: ${error.error?.message || response.statusText}`);
-  }
-  
-  const data = await response.json();
-  return data.data[0].embedding;
-}
-
-/**
- * Generate embeddings using Hugging Face API
- */
-async function generateHuggingFaceEmbeddings(text: string, apiKey: string): Promise<number[]> {
-  const response = await fetch('https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      inputs: text,
-      options: {
-        wait_for_model: true,
-      },
-    }),
-  });
-  
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(`Hugging Face Embeddings API error: ${error.error || response.statusText}`);
-  }
-  
-  const data = await response.json();
-  return Array.isArray(data[0]) ? data[0] : data;
-}
 
 /**
  * Search SAM.gov opportunities
@@ -136,7 +54,7 @@ async function generateHuggingFaceEmbeddings(text: string, apiKey: string): Prom
 async function searchSAMOpportunities(
   filters: SAMSearchFilters,
   samApiKey: string
-): Promise<SAMOpportunity[]> {
+): Promise<{ opportunities: SAMOpportunity[]; totalRecords: number }> {
   // Generate cache key based on filters
   const cacheKey = generateCacheKey(JSON.stringify(filters), 'sam-search');
   
@@ -144,7 +62,7 @@ async function searchSAMOpportunities(
   return withCache(cacheKey, async () => {
     const params = new URLSearchParams();
     
-    // Add search parameters
+    // Add search parameters using correct SAM.gov API parameters
     if (filters.keyword) {
       params.append('q', filters.keyword);
     }
@@ -157,66 +75,20 @@ async function searchSAMOpportunities(
       params.append('postedTo', filters.endDate);
     }
     
+    // Use ncode for NAICS codes (single value)
     if (filters.naicsCode) {
-      params.append('naicsCode', filters.naicsCode);
+      // Take the first NAICS code if multiple are provided
+      const naicsCodes = filters.naicsCode.split(',').map(code => code.trim()).filter(code => code);
+      if (naicsCodes.length > 0) {
+        params.append('ncode', naicsCodes[0]);
+      }
     }
     
-    if (filters.state) {
-      params.append('state', filters.state);
-    }
+    // Set opportunity type to 'o' for opportunities
+    params.append('ptype', 'o');
     
-    if (filters.agency) {
-      params.append('agency', filters.agency);
-    }
-    
-    if (filters.type) {
-      params.append('noticeType', filters.type);
-    }
-    
-    if (filters.setAside) {
-      params.append('setAside', filters.setAside);
-    }
-    
-    if (filters.active !== undefined) {
-      params.append('active', filters.active.toString());
-    }
-    
-    // Enhanced search parameters
-    if (filters.entityName) {
-      params.append('entityName', filters.entityName);
-    }
-    
-    if (filters.contractVehicle) {
-      params.append('contractVehicle', filters.contractVehicle);
-    }
-    
-    if (filters.classificationCode) {
-      params.append('classificationCode', filters.classificationCode);
-    }
-    
-    if (filters.fundingSource) {
-      params.append('fundingSource', filters.fundingSource);
-    }
-    
-    if (filters.responseDeadline?.from) {
-      params.append('responseDeadlineFrom', filters.responseDeadline.from);
-    }
-    
-    if (filters.responseDeadline?.to) {
-      params.append('responseDeadlineTo', filters.responseDeadline.to);
-    }
-    
-    if (filters.estimatedValue?.min) {
-      params.append('estimatedValueMin', filters.estimatedValue.min.toString());
-    }
-    
-    if (filters.estimatedValue?.max) {
-      params.append('estimatedValueMax', filters.estimatedValue.max.toString());
-    }
-    
-    if (filters.hasAttachments) {
-      params.append('hasAttachments', 'true');
-    }
+    // Set active to false to get all opportunities
+    params.append('active', 'false');
     
     params.append('limit', Math.min(filters.limit || 50, 100).toString());
     params.append('offset', (filters.offset || 0).toString());
@@ -262,8 +134,11 @@ async function searchSAMOpportunities(
     
     const data = await response.json();
     
+    // Extract total count from SAM.gov response
+    const totalRecords = data.totalRecords || data.opportunitiesData?.length || 0;
+    
     // Transform SAM.gov response to our format
-    return data.opportunitiesData?.map((opportunity: any) => ({
+    const opportunities = data.opportunitiesData?.map((opportunity: any) => ({
       id: opportunity.noticeId || opportunity.solicitationNumber,
       noticeId: opportunity.noticeId,
       title: opportunity.title,
@@ -291,52 +166,12 @@ async function searchSAMOpportunities(
       isFavorite: false,
       tags: [],
     })) || [];
+    
+    return { opportunities, totalRecords };
   }, { prefix: 'sam-search', ttl: 1800 }); // Cache for 30 minutes
 }
 
-/**
- * Perform semantic search on opportunities
- */
-async function performSemanticSearch(
-  opportunities: SAMOpportunity[],
-  query: string,
-  provider: string,
-  apiKey: string
-): Promise<SAMOpportunity[]> {
-  if (!query.trim()) {
-    return opportunities;
-  }
-  
-  try {
-    // Generate embeddings for the search query
-    const queryEmbeddings = await generateEmbeddings(query, provider, apiKey);
-    
-    // Generate embeddings for each opportunity and calculate similarity
-    const opportunitiesWithScores = await Promise.all(
-      opportunities.map(async (opportunity) => {
-        const text = `${opportunity.title} ${opportunity.description} ${opportunity.synopsis}`;
-        const opportunityEmbeddings = await generateEmbeddings(text, provider, apiKey);
-        
-        const similarity = cosineSimilarity(queryEmbeddings, opportunityEmbeddings);
-        
-        return {
-          ...opportunity,
-          relevanceScore: similarity,
-        };
-      })
-    );
-    
-    // Sort by relevance score (descending) and return top results
-    return opportunitiesWithScores
-      .sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0))
-      .slice(0, 25); // Return top 25 most relevant
-      
-  } catch (error) {
-    console.error('Semantic search error:', error);
-    // Fall back to original results if semantic search fails
-    return opportunities;
-  }
-}
+
 
 /**
  * Main SAM search API handler
@@ -354,17 +189,20 @@ export async function GET(req: NextRequest) {
     const keyword = searchParams.get('q');
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
-    const naicsCode = searchParams.get('naicsCode');
+    // Handle multiple NAICS codes and opportunity types
+    const naicsCodes = searchParams.getAll('naicsCode');
+    const naicsCode = naicsCodes.length > 0 ? naicsCodes.join(',') : null;
     const state = searchParams.get('state');
     const agency = searchParams.get('agency');
-    const type = searchParams.get('type');
+    const opportunityTypes = searchParams.getAll('type');
+    const type = opportunityTypes.length > 0 ? opportunityTypes.join(',') : null;
     const setAside = searchParams.get('setAside');
     const active = searchParams.get('active');
     const limit = searchParams.get('limit');
     const offset = searchParams.get('offset');
     const semantic = searchParams.get('semantic');
     const provider = searchParams.get('provider') || 'openai';
-    const samApiKey = searchParams.get('samApiKey');
+    const samApiKey = searchParams.get('samApiKey') || searchParams.get('api_key');
     const entityName = searchParams.get('entityName');
     const contractVehicle = searchParams.get('contractVehicle');
     const classificationCode = searchParams.get('classificationCode');
@@ -382,10 +220,9 @@ export async function GET(req: NextRequest) {
       }, { status: 400 });
     }
     
-    // Set default date range if not provided (last 30 days)
+    // Set default date range if not provided (current year)
     const today = new Date();
-    const thirtyDaysAgo = new Date(today);
-    thirtyDaysAgo.setDate(today.getDate() - 30);
+    const startOfYear = new Date(today.getFullYear(), 0, 1); // January 1st of current year
     
     // Format dates as MM/dd/yyyy for SAM.gov API
     const formatDateForSAM = (date: Date) => {
@@ -419,7 +256,7 @@ export async function GET(req: NextRequest) {
       return undefined;
     };
     
-    const defaultStartDate = formatDateForSAM(thirtyDaysAgo);
+    const defaultStartDate = formatDateForSAM(startOfYear);
     const defaultEndDate = formatDateForSAM(today);
     
     // Build search filters
@@ -433,7 +270,7 @@ export async function GET(req: NextRequest) {
       type: type || undefined,
       setAside: setAside || undefined,
       active: active === 'true',
-      limit: limit ? parseInt(limit) : 50,
+      limit: limit ? parseInt(limit) : 100, // Increased default limit for better search results
       offset: offset ? parseInt(offset) : 0,
       // Enhanced filters
       entityName: entityName || undefined,
@@ -469,7 +306,9 @@ export async function GET(req: NextRequest) {
     if (!samApiKey) {
       return NextResponse.json({ error: 'SAM API key is required' }, { status: 400 });
     }
-    const opportunities = await searchSAMOpportunities(filters, samApiKey);
+    const searchResult = await searchSAMOpportunities(filters, samApiKey);
+    const opportunities = searchResult.opportunities;
+    const totalRecords = searchResult.totalRecords;
     
     // Add opportunities to vector store for future semantic search
     if (opportunities.length > 0) {
@@ -482,24 +321,13 @@ export async function GET(req: NextRequest) {
       }
     }
     
-    // Perform semantic search if requested and query is provided
-    let finalOpportunities = opportunities;
-    if (semantic === 'true' && keyword) {
-      const llmApiKey = req.headers.get('authorization')?.replace('Bearer ', '');
-      if (llmApiKey) {
-        finalOpportunities = await performSemanticSearch(
-          opportunities,
-          keyword,
-          provider,
-          llmApiKey
-        );
-      }
-    }
+    // No client-side filtering - use SAM.gov API results directly
+    const finalOpportunities = opportunities;
     
     // Build response
     const response: SAMSearchResponse = {
       opportunities: finalOpportunities,
-      totalRecords: opportunities.length,
+      totalRecords: totalRecords,
       limit: filters.limit || 50,
       offset: filters.offset || 0,
       facets: {
@@ -541,15 +369,6 @@ export async function GET(req: NextRequest) {
 // Cleanup function to remove old cache entries
 setInterval(() => {
   const now = Date.now();
-  
-  // Clean embedding cache (keep last 1000 entries)
-  if (embeddingCache.size > 1000) {
-    const entries = Array.from(embeddingCache.entries());
-    embeddingCache.clear();
-    entries.slice(-500).forEach(([key, value]) => {
-      embeddingCache.set(key, value);
-    });
-  }
   
   // Clean search results cache
   Array.from(searchResultsCache.entries()).forEach(([key, value]) => {

@@ -105,6 +105,8 @@ export const vectorStoreServerUtils = {
    */
   async addCompanyProfile(profile: CompanyProfile, embeddingConfig?: EmbeddingConfig): Promise<void> {
     try {
+      console.log(`🚀 Adding company profile to vector store: ${profile.entityName} (ID: ${profile.id})`);
+      
       // Create a comprehensive text representation of the company profile
       const profileText = [
         profile.entityName || '',
@@ -133,14 +135,19 @@ export const vectorStoreServerUtils = {
         profile.contactInfo?.website || ''
       ].filter(Boolean).join(' ');
 
+      console.log(`📝 Profile text length: ${profileText.length} characters`);
+      console.log(`📝 Profile text preview: ${profileText.substring(0, 200)}...`);
+
       if (!profileText.trim()) {
-        console.warn('Skipping company profile with no text content:', profile.id);
+        console.warn('⚠️ Skipping company profile with no text content:', profile.id);
         return;
       }
 
       // Generate proper embedding
+      console.log(`🧠 Generating embedding for profile...`);
       const embeddingService = getEmbeddingService(embeddingConfig);
       const embedding = await embeddingService.getEmbedding(profileText);
+      console.log(`✅ Generated embedding with ${embedding.length} dimensions`);
       
       const vector: Vector = {
         id: `profile_${profile.id}`,
@@ -159,8 +166,19 @@ export const vectorStoreServerUtils = {
         }
       };
 
+      console.log(`💾 Storing vector with ID: ${vector.id}`);
+      console.log(`📋 Vector metadata:`, vector.metadata);
+      
       await this.storeVectors([vector], 'company_profiles');
-      console.log(`✅ Added company profile to vector store: ${profile.entityName}`);
+      console.log(`✅ Successfully added company profile to vector store: ${profile.entityName}`);
+      
+      // Verify it was stored
+      const storedVector = await this.getCompanyProfileVector(profile.id);
+      if (storedVector) {
+        console.log(`✅ Verification: Company profile found in vector store after storage`);
+      } else {
+        console.warn(`⚠️ Verification failed: Company profile not found in vector store after storage`);
+      }
     } catch (error) {
       console.error('❌ Failed to add company profile to vector store:', error);
       throw error;
@@ -198,13 +216,18 @@ export const vectorStoreServerUtils = {
     embeddingConfig?: EmbeddingConfig
   ): Promise<Array<{ opportunity: SAMOpportunity; score: number }>> {
     try {
+      console.log(`🔍 Finding matching opportunities for company: ${companyProfile.entityName} (ID: ${companyProfile.id})`);
+      
       // First, get the company profile vector
       const profileVector = await this.getCompanyProfileVector(companyProfile.id);
       if (!profileVector) {
-        console.warn('Company profile not found in vector store');
+        console.warn('❌ Company profile not found in vector store');
+        console.log(`🔍 Available collections:`, await this.listCollections());
         return [];
       }
 
+      console.log(`✅ Found company profile vector, searching for similar opportunities...`);
+      
       // Search for similar opportunities
       const results = await this.searchVectors(
         profileVector.values,
@@ -212,6 +235,8 @@ export const vectorStoreServerUtils = {
         topK,
         { type: 'opportunity' }
       );
+
+      console.log(`🔍 Found ${results.length} matching opportunities`);
 
       // Convert results to opportunity objects
       const matchingOpportunities = results.map(result => ({
@@ -245,6 +270,7 @@ export const vectorStoreServerUtils = {
         score: result.score
       }));
 
+      console.log(`✅ Returning ${matchingOpportunities.length} matching opportunities`);
       return matchingOpportunities;
     } catch (error) {
       console.error('❌ Failed to find matching opportunities:', error);
@@ -253,13 +279,60 @@ export const vectorStoreServerUtils = {
   },
 
   /**
+   * Calculate match score between company profile and specific opportunity
+   */
+  async calculateOpportunityMatch(
+    companyProfile: CompanyProfile,
+    opportunityId: string,
+    embeddingConfig?: EmbeddingConfig
+  ): Promise<number> {
+    try {
+      // Get the company profile vector
+      const profileVector = await this.getCompanyProfileVector(companyProfile.id);
+      if (!profileVector) {
+        console.warn('Company profile not found in vector store');
+        return 0;
+      }
+
+      // Get the opportunity vector
+      const vectorStore = await getVectorStoreAdapter();
+      const opportunityVector = await vectorStore.getVector('sam_opportunities', opportunityId);
+      
+      if (!opportunityVector) {
+        console.warn('Opportunity not found in vector store');
+        return 0;
+      }
+
+      // Calculate cosine similarity
+      const similarity = this.cosineSimilarity(profileVector.values, opportunityVector.values);
+      
+      console.log(`✅ Calculated match score for opportunity ${opportunityId}: ${similarity}`);
+      return similarity;
+    } catch (error) {
+      console.error('❌ Failed to calculate opportunity match:', error);
+      return 0;
+    }
+  },
+
+  /**
    * Get a specific company profile vector
    */
   async getCompanyProfileVector(profileId: string): Promise<Vector | null> {
     try {
+      console.log(`🔍 Looking for company profile vector with profileId: ${profileId}`);
       const vectorStore = await getVectorStoreAdapter();
       
-      // Search for the specific profile
+      // First try to get the vector directly by ID
+      console.log(`🔍 Trying direct vector lookup with ID: profile_${profileId}`);
+      const directVector = await vectorStore.getVector('company_profiles', `profile_${profileId}`);
+      if (directVector) {
+        console.log(`✅ Found company profile vector directly: ${directVector.id}`);
+        console.log(`📋 Vector metadata:`, directVector.metadata);
+        return directVector;
+      }
+      
+      console.log(`⚠️ Direct lookup failed, trying query with metadata filter...`);
+      // Fallback: Search for the specific profile using metadata filter
       const results = await vectorStore.query(
         'company_profiles',
         new Array(1536).fill(0), // Dummy vector for exact match
@@ -267,8 +340,11 @@ export const vectorStoreServerUtils = {
         { profileId }
       );
 
+      console.log(`🔍 Query returned ${results.length} results`);
       if (results.length > 0) {
         const result = results[0];
+        console.log(`✅ Found company profile vector via query: ${result.id}`);
+        console.log(`📋 Vector metadata:`, result.metadata);
         return {
           id: result.id,
           values: result.values || [],
@@ -276,6 +352,8 @@ export const vectorStoreServerUtils = {
         };
       }
 
+      console.warn(`❌ Company profile vector not found for profileId: ${profileId}`);
+      console.log(`🔍 Available collections:`, await vectorStore.listCollections());
       return null;
     } catch (error) {
       console.error('❌ Failed to get company profile vector:', error);
@@ -382,5 +460,33 @@ export const vectorStoreServerUtils = {
       vector[i] = Math.sin(hash + i) * 0.1;
     }
     return vector;
+  },
+
+  /**
+   * Calculate cosine similarity between two vectors
+   */
+  cosineSimilarity(vectorA: number[], vectorB: number[]): number {
+    if (vectorA.length !== vectorB.length) {
+      throw new Error('Vectors must have the same length');
+    }
+
+    let dotProduct = 0;
+    let normA = 0;
+    let normB = 0;
+
+    for (let i = 0; i < vectorA.length; i++) {
+      dotProduct += vectorA[i] * vectorB[i];
+      normA += vectorA[i] * vectorA[i];
+      normB += vectorB[i] * vectorB[i];
+    }
+
+    normA = Math.sqrt(normA);
+    normB = Math.sqrt(normB);
+
+    if (normA === 0 || normB === 0) {
+      return 0;
+    }
+
+    return dotProduct / (normA * normB);
   }
 }; 

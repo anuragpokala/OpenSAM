@@ -23,6 +23,7 @@ export interface CacheStats {
 export interface VectorStoreAdapter {
   upsert(collection: string, vectors: Vector[], metadata?: Record<string, any>): Promise<void>;
   query(collection: string, vector: number[], topK?: number, filter?: Record<string, any>): Promise<VectorSearchResult[]>;
+  getVector(collection: string, id: string): Promise<Vector | null>;
   delete(collection: string, ids?: string[]): Promise<void>;
   listCollections(): Promise<string[]>;
   createCollection(collection: string, dimension?: number): Promise<void>;

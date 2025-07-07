@@ -71,6 +71,28 @@ export async function GET(req: NextRequest) {
           message: `Collection ${collection} deleted successfully` 
         });
 
+      case 'delete-record':
+        // Delete individual records from a collection
+        if (!collection) {
+          return NextResponse.json({ 
+            error: 'Collection parameter is required for delete-record action' 
+          }, { status: 400 });
+        }
+
+        const recordIds = searchParams.get('ids');
+        if (!recordIds) {
+          return NextResponse.json({ 
+            error: 'Record IDs parameter is required for delete-record action' 
+          }, { status: 400 });
+        }
+
+        const ids = recordIds.split(',').map(id => id.trim());
+        await vectorStoreServerUtils.deleteVectors(collection, ids);
+        return NextResponse.json({ 
+          success: true, 
+          message: `${ids.length} record(s) deleted from collection ${collection}` 
+        });
+
       default:
         // Default: return comprehensive vector store information
         const [storeStats, storeCollections] = await Promise.all([

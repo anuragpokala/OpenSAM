@@ -186,7 +186,7 @@ interface AppStore extends AppState {
   exportData: () => string;
   importData: (data: string) => void;
         initializeStore: () => Promise<void>;
-  loadSavedProfiles: () => CompanyProfile[];
+  loadSavedProfiles: () => Promise<CompanyProfile[]>;
   loadProfile: (profileId: string) => CompanyProfile | null;
 }
 
@@ -602,6 +602,9 @@ export const useAppStore = create<AppStore>()(
           // Update store
           set({ companyProfile: profile });
           
+          // Trigger a refresh of saved profiles in the UI
+          // This will be handled by the component's useEffect
+          
           // Add to vector store for matching (server-side only)
           if (typeof window === 'undefined') {
             try {
@@ -778,24 +781,80 @@ export const useAppStore = create<AppStore>()(
         }
       },
 
-      loadSavedProfiles: () => {
+      loadSavedProfiles: async () => {
         try {
-          const profiles = JSON.parse(localStorage.getItem('opensam-company-profiles') || '{}');
-          return Object.values(profiles);
+          console.log('🔄 Loading company profiles from vector store...');
+          
+          // Fetch profiles from vector store API
+          const response = await fetch('/api/company-profiles');
+          if (!response.ok) {
+            throw new Error(`Failed to fetch profiles: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          if (data.success && data.data.profiles) {
+            console.log(`✅ Loaded ${data.data.profiles.length} company profiles from vector store`);
+            return data.data.profiles;
+          } else {
+            console.warn('⚠️ No profiles found in vector store');
+            return [];
+          }
         } catch (error) {
-          console.error('Failed to load saved profiles:', error);
-          return [];
+          console.error('❌ Failed to load profiles from vector store:', error);
+          // Fallback to localStorage if vector store is unavailable
+          try {
+            const profiles = JSON.parse(localStorage.getItem('opensam-company-profiles') || '{}');
+            console.log('🔄 Falling back to localStorage profiles');
+            return Object.values(profiles);
+          } catch (localStorageError) {
+            console.error('❌ Failed to load profiles from localStorage:', localStorageError);
+            return [];
+          }
         }
       },
 
       loadProfile: (profileId: string) => {
         try {
+          console.log(`🔄 Loading company profile with ID: ${profileId}`);
           const profiles = JSON.parse(localStorage.getItem('opensam-company-profiles') || '{}');
           const profile = profiles[profileId];
           if (profile) {
+            console.log(`✅ Found company profile in localStorage: ${profile.entityName}`);
             set({ companyProfile: profile });
+            
+            // Also add to vector store for matching
+            if (typeof window === 'undefined') {
+              console.log(`🔄 Server-side: Adding company profile to vector store...`);
+              // Server-side: direct vector store addition
+              try {
+                const { vectorStoreServerUtils } = require('@/lib/vectorStore-server');
+                vectorStoreServerUtils.addCompanyProfile(profile).catch((error: any) => {
+                  console.warn('⚠️ Failed to add company profile to vector store:', error);
+                });
+              } catch (vectorError) {
+                console.warn('⚠️ Failed to import vector store utils:', vectorError);
+              }
+            } else {
+              console.log(`🔄 Browser: Adding company profile to vector store via API...`);
+              // Browser: API call to add to vector store
+              fetch('/api/company-profile/vectorize', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ profile })
+              }).then(response => {
+                if (response.ok) {
+                  console.log('✅ Company profile added to vector store via API');
+                } else {
+                  console.warn('⚠️ Failed to add company profile to vector store via API');
+                }
+              }).catch(apiError => {
+                console.warn('⚠️ Failed to add company profile to vector store via API:', apiError);
+              });
+            }
+            
             return profile;
           }
+          console.warn(`⚠️ Company profile not found in localStorage for ID: ${profileId}`);
           return null;
         } catch (error) {
           console.error('Failed to load profile:', error);

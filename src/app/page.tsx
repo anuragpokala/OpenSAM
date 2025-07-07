@@ -33,23 +33,37 @@ import { CompanyProfile } from '@/types';
 
 // Add logo SVGs at the top (after imports)
 const OpenAILogo = ({ className = "" }) => (
-  <svg className={className} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="16" cy="16" r="16" fill="#10A37F" />
-    <path d="M16 7.5c-2.5 0-4.5 2-4.5 4.5v8c0 2.5 2 4.5 4.5 4.5s4.5-2 4.5-4.5v-8c0-2.5-2-4.5-4.5-4.5z" fill="#fff"/>
+  <svg className={className} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <g>
+      <circle cx="20" cy="20" r="20" fill="#10A37F" />
+      <path d="M27.5 13.5c-.6-1-1.7-1.3-2.7-.7l-1.2.7c-.2-.1-.5-.2-.7-.3l-.2-1.3c-.2-1.1-1.2-1.9-2.3-1.7-.6.1-1.1.5-1.4 1l-.7 1.2c-.2.1-.5.2-.7.3l-1.3-.2c-1.1-.2-2.1.6-2.3 1.7-.1.6.1 1.2.5 1.6l.7 1.2c-.1.2-.2.5-.3.7l-1.3.2c-1.1.2-1.9 1.2-1.7 2.3.1.6.5 1.1 1 1.4l1.2.7c.1.2.2.5.3.7l-.2 1.3c-.2 1.1.6 2.1 1.7 2.3.6.1 1.2-.1 1.6-.5l1.2-.7c.2.1.5.2.7.3l.2 1.3c.2 1.1 1.2 1.9 2.3 1.7.6-.1 1.1-.5 1.4-1l.7-1.2c.2-.1.5-.2.7-.3l1.3.2c1.1.2 2.1-.6 2.3-1.7.1-.6-.1-1.2-.5-1.6l-.7-1.2c.1-.2.2-.5.3-.7l1.3-.2c1.1-.2 1.9-1.2 1.7-2.3-.1-.6-.5-1.1-1-1.4l-1.2-.7c-.1-.2-.2-.5-.3-.7l.2-1.3c.2-1.1-.6-2.1-1.7-2.3z" fill="#fff"/>
+    </g>
   </svg>
 );
+
 const AnthropicLogo = ({ className = "" }) => (
-  <svg className={className} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect x="4" y="4" width="24" height="24" rx="12" fill="#FFCD1C" />
-    <rect x="10" y="10" width="12" height="12" rx="6" fill="#fff" />
+  <svg className={className} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <g>
+      <circle cx="20" cy="20" r="20" fill="#FFCD1C" />
+      <rect x="12" y="12" width="16" height="16" rx="8" fill="#fff" />
+      <rect x="16" y="16" width="8" height="8" rx="4" fill="#FFCD1C" />
+      <circle cx="20" cy="20" r="2.5" fill="#fff" />
+    </g>
   </svg>
 );
+
 const HuggingFaceLogo = ({ className = "" }) => (
-  <svg className={className} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="16" cy="16" r="16" fill="#FFD21F" />
-    <ellipse cx="16" cy="20" rx="7" ry="3" fill="#fff" />
-    <ellipse cx="12" cy="14" rx="1.5" ry="2" fill="#000" />
-    <ellipse cx="20" cy="14" rx="1.5" ry="2" fill="#000" />
+  <svg className={className} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <g>
+      <circle cx="20" cy="20" r="20" fill="#FFD21F" />
+      <ellipse cx="20" cy="24" rx="8" ry="5" fill="#fff" />
+      <ellipse cx="16" cy="22" rx="1.5" ry="2" fill="#000" />
+      <ellipse cx="24" cy="22" rx="1.5" ry="2" fill="#000" />
+      <path d="M16 26c1.5 1 6.5 1 8 0" stroke="#000" strokeWidth="1.2" strokeLinecap="round"/>
+      <ellipse cx="20" cy="18" rx="7" ry="6" fill="#fff" />
+      <ellipse cx="17" cy="18" rx="1.2" ry="1.5" fill="#000" />
+      <ellipse cx="23" cy="18" rx="1.2" ry="1.5" fill="#000" />
+    </g>
   </svg>
 );
 
@@ -68,6 +82,8 @@ export default function Dashboard() {
   const [showSettings, setShowSettings] = useState(false);
   const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false);
   const [selectedCompanyProfile, setSelectedCompanyProfile] = useState<CompanyProfile | null>(null);
+  const [showCompanyProfileSelector, setShowCompanyProfileSelector] = useState(false);
+  const [savedProfiles, setSavedProfiles] = useState<CompanyProfile[]>([]);
   
   const { sidebarOpen, currentView, theme } = useUIState();
   const llmConfig = useLLMConfig();
@@ -79,7 +95,8 @@ export default function Dashboard() {
     setLLMModel, 
     setLLMApiKey,
     validateLLMConfig,
-    loadProfile
+    loadProfile,
+    loadSavedProfiles
   } = useAppStore();
 
   // Initialize app
@@ -104,6 +121,21 @@ export default function Dashboard() {
 
     initializeApp();
   }, [llmConfig]);
+
+  // Load saved profiles from vector store
+  useEffect(() => {
+    const loadProfiles = async () => {
+      try {
+        const profiles = await loadSavedProfiles();
+        setSavedProfiles(profiles);
+      } catch (error) {
+        console.error('Failed to load saved profiles:', error);
+        setSavedProfiles([]);
+      }
+    };
+
+    loadProfiles();
+  }, [loadSavedProfiles]);
 
   // Load selected company profile from localStorage on mount
   useEffect(() => {
@@ -131,6 +163,21 @@ export default function Dashboard() {
       localStorage.removeItem('opensam-selected-company-profile');
     }
   }, [selectedCompanyProfile]);
+
+  // Close company profile selector when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (showCompanyProfileSelector && !target.closest('.company-profile-selector')) {
+        setShowCompanyProfileSelector(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showCompanyProfileSelector]);
 
   // Handle API key setup
   const handleApiKeySetup = async (provider: string, apiKey: string) => {
@@ -280,21 +327,81 @@ export default function Dashboard() {
                 {llmConfig.apiKey ? `${llmConfig.provider} connected` : 'No API key'}
               </span>
             </div>
-            {/* Global Company Profile Indicator */}
-            <div className="hidden sm:flex items-center space-x-2 text-sm">
-              {selectedCompanyProfile ? (
-                <div className="flex items-center space-x-1 px-2 py-1 bg-blue-50 border border-blue-200 rounded-md">
-                  <Building className="h-3 w-3 text-blue-600" />
-                  <span className="text-blue-700 font-medium">
-                    {selectedCompanyProfile.entityName}
+            {/* Global Company Profile Selector */}
+            <div className="hidden sm:flex items-center space-x-2 text-sm relative company-profile-selector">
+              <div className="relative">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center space-x-1 px-2 py-1 h-auto"
+                  onClick={() => setShowCompanyProfileSelector(!showCompanyProfileSelector)}
+                >
+                  <Building className="h-3 w-3" />
+                  <span className="font-medium">
+                    {selectedCompanyProfile ? selectedCompanyProfile.entityName : 'Select Company'}
                   </span>
-                </div>
-              ) : (
-                <div className="flex items-center space-x-1 px-2 py-1 bg-gray-50 border border-gray-200 rounded-md">
-                  <Building className="h-3 w-3 text-gray-500" />
-                  <span className="text-gray-600">No Company Selected</span>
-                </div>
-              )}
+                  <ChevronDown className="h-3 w-3" />
+                </Button>
+                
+                {/* Company Profile Dropdown */}
+                {showCompanyProfileSelector && (
+                  <div className="absolute right-0 top-full mt-1 w-64 bg-background border border-border rounded-lg shadow-lg z-50">
+                    <div className="p-2">
+                      <div className="text-xs font-medium text-muted-foreground mb-2 px-2">Saved Profiles</div>
+                      {savedProfiles.length > 0 ? (
+                        <div className="space-y-1">
+                          {savedProfiles.map((profile: CompanyProfile) => (
+                            <div
+                              key={profile.id}
+                              className={`p-2 rounded cursor-pointer transition-colors ${
+                                selectedCompanyProfile?.id === profile.id
+                                  ? 'bg-primary text-primary-foreground'
+                                  : 'hover:bg-muted'
+                              }`}
+                              onClick={() => {
+                                setSelectedCompanyProfile(profile);
+                                setShowCompanyProfileSelector(false);
+                              }}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <p className="font-medium text-sm">{profile.entityName || 'Unnamed Company'}</p>
+                                  <p className="text-xs opacity-75">
+                                    {profile.naicsCodes?.length > 0 ? `NAICS: ${profile.naicsCodes.join(', ')}` : 'No NAICS codes'}
+                                  </p>
+                                </div>
+                                {selectedCompanyProfile?.id === profile.id && (
+                                  <div className="w-2 h-2 bg-current rounded-full"></div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="p-2 text-xs text-muted-foreground">
+                          No saved profiles. Create one in the AI Company Profile section.
+                        </div>
+                      )}
+                      
+                      {selectedCompanyProfile && (
+                        <div className="mt-2 pt-2 border-t border-border">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full text-xs text-destructive hover:text-destructive"
+                            onClick={() => {
+                              setSelectedCompanyProfile(null);
+                              setShowCompanyProfileSelector(false);
+                            }}
+                          >
+                            Clear Selection
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
             <ThemeToggle />
             <Button
@@ -309,10 +416,10 @@ export default function Dashboard() {
 
         {/* Main Content Area */}
         <main className="p-6">
-          {currentView === 'chat' && <ChatView selectedCompanyProfile={selectedCompanyProfile} setSelectedCompanyProfile={setSelectedCompanyProfile} />}
+          {currentView === 'chat' && <ChatView selectedCompanyProfile={selectedCompanyProfile} setSelectedCompanyProfile={setSelectedCompanyProfile} savedProfiles={savedProfiles} />}
           {currentView === 'search' && <SearchView />}
           {currentView === 'forecast' && <ForecastView />}
-          {currentView === 'upload' && <UploadView />}
+          {currentView === 'upload' && <UploadView savedProfiles={savedProfiles} />}
           {currentView === 'vectorstore' && <VectorStoreView />}
         </main>
       </div>
@@ -541,10 +648,12 @@ export default function Dashboard() {
 // Chat View Component
 function ChatView({ 
   selectedCompanyProfile, 
-  setSelectedCompanyProfile 
+  setSelectedCompanyProfile,
+  savedProfiles
 }: { 
   selectedCompanyProfile: CompanyProfile | null; 
   setSelectedCompanyProfile: React.Dispatch<React.SetStateAction<CompanyProfile | null>>; 
+  savedProfiles: CompanyProfile[];
 }) {
   const [inputMessage, setInputMessage] = useState('');
   const [messages, setMessages] = useState<Array<{role: 'user' | 'assistant', content: string}>>([]);
@@ -555,7 +664,7 @@ function ChatView({
   const companyProfile = useCompanyProfile();
   const prepopulatedMessage = useAppStore((state) => state.prepopulatedMessage);
   const setPrepopulatedMessage = useAppStore((state) => state.setPrepopulatedMessage);
-  const { loadSavedProfiles } = useAppStore();
+  const { loadSavedProfiles, loadProfile } = useAppStore();
 
   // Handle prepopulated message
   useEffect(() => {
@@ -705,8 +814,8 @@ function ChatView({
               <div className="p-4 border border-opensam-gray-200 rounded-lg bg-opensam-gray-50">
                 <h4 className="font-medium text-opensam-black mb-3">Select Company Profile</h4>
                 <div className="space-y-2">
-                  {loadSavedProfiles().length > 0 ? (
-                    loadSavedProfiles().map((profile: CompanyProfile) => (
+                  {savedProfiles.length > 0 ? (
+                    savedProfiles.map((profile: CompanyProfile) => (
                       <div
                         key={profile.id}
                         className={`p-3 border rounded-lg cursor-pointer transition-colors ${
@@ -720,7 +829,7 @@ function ChatView({
                         }}
                       >
                         <div className="flex items-center justify-between">
-                          <div>
+                          <div className="flex-1">
                             <p className="font-medium">{profile.entityName || 'Unnamed Company'}</p>
                             <p className="text-sm opacity-75">
                               {profile.naicsCodes?.length > 0 ? `NAICS: ${profile.naicsCodes.join(', ')}` : 'No NAICS codes'}
@@ -896,7 +1005,7 @@ function ForecastView() {
 }
 
 // AI Company Profile View Component
-function UploadView() {
+function UploadView({ savedProfiles }: { savedProfiles: CompanyProfile[] }) {
   const [ueiSAM, setUeiSAM] = useState('');
   const [description, setDescription] = useState('');
   const [businessTypes, setBusinessTypes] = useState<string[]>([]);
@@ -1128,7 +1237,7 @@ function UploadView() {
                   value=""
                 >
                   <option value="">Select a saved profile...</option>
-                  {loadSavedProfiles().map((profile: any) => (
+                  {savedProfiles.map((profile: any) => (
                     <option key={profile.id} value={profile.id}>
                       {profile.entityName || 'Unnamed Profile'} ({new Date(profile.createdAt).toLocaleDateString()})
                     </option>
@@ -1645,6 +1754,7 @@ function VectorStoreView() {
   const [selectedCollection, setSelectedCollection] = useState<string | null>(null);
   const [collectionDetails, setCollectionDetails] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selectedRecords, setSelectedRecords] = useState<Set<string>>(new Set());
 
   // Load vector store data on component mount
   useEffect(() => {
@@ -1724,6 +1834,92 @@ function VectorStoreView() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const deleteRecord = async (collectionName: string, recordId: string) => {
+    if (!confirm(`Are you sure you want to delete the record "${recordId}" from collection "${collectionName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const response = await fetch(`/api/vector-store?action=delete-record&collection=${collectionName}&ids=${recordId}`, {
+        method: 'GET'
+      });
+      const result = await response.json();
+      
+      if (result.success) {
+        // Reload collection details after deletion
+        if (selectedCollection === collectionName) {
+          await loadCollectionDetails(collectionName);
+        }
+        // Also reload main data to update counts
+        await loadVectorStoreData();
+      } else {
+        setError(result.error || 'Failed to delete record');
+      }
+    } catch (error) {
+      console.error('Failed to delete record:', error);
+      setError('Failed to delete record');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const deleteSelectedRecords = async () => {
+    if (selectedRecords.size === 0) return;
+    
+    if (!confirm(`Are you sure you want to delete ${selectedRecords.size} selected record(s) from collection "${selectedCollection}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const recordIds = Array.from(selectedRecords).join(',');
+      const response = await fetch(`/api/vector-store?action=delete-record&collection=${selectedCollection}&ids=${recordIds}`, {
+        method: 'GET'
+      });
+      const result = await response.json();
+      
+      if (result.success) {
+        // Clear selection and reload data
+        setSelectedRecords(new Set());
+        await loadCollectionDetails(selectedCollection!);
+        await loadVectorStoreData();
+      } else {
+        setError(result.error || 'Failed to delete selected records');
+      }
+    } catch (error) {
+      console.error('Failed to delete selected records:', error);
+      setError('Failed to delete selected records');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const toggleRecordSelection = (recordId: string) => {
+    const newSelection = new Set(selectedRecords);
+    if (newSelection.has(recordId)) {
+      newSelection.delete(recordId);
+    } else {
+      newSelection.add(recordId);
+    }
+    setSelectedRecords(newSelection);
+  };
+
+  const selectAllRecords = () => {
+    if (collectionDetails?.samples) {
+      const allIds = collectionDetails.samples.map((sample: any) => sample.id);
+      setSelectedRecords(new Set(allIds));
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedRecords(new Set());
   };
 
   const formatMetadata = (metadata: any) => {
@@ -1921,6 +2117,7 @@ function VectorStoreView() {
                     onClick={() => {
                       setSelectedCollection(null);
                       setCollectionDetails(null);
+                      setSelectedRecords(new Set());
                     }}
                   >
                     <X className="h-4 w-4" />
@@ -1932,18 +2129,73 @@ function VectorStoreView() {
                     <p className="text-sm text-muted-foreground">
                       Total items: {collectionDetails.count}
                     </p>
+                    <div className="flex items-center space-x-2">
+                      {selectedRecords.size > 0 && (
+                        <span className="text-sm text-muted-foreground">
+                          {selectedRecords.size} selected
+                        </span>
+                      )}
+                      {selectedRecords.size > 0 && (
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={deleteSelectedRecords}
+                          disabled={isLoading}
+                        >
+                          Delete Selected ({selectedRecords.size})
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={selectAllRecords}
+                      disabled={isLoading}
+                    >
+                      Select All
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={clearSelection}
+                      disabled={isLoading}
+                    >
+                      Clear Selection
+                    </Button>
                   </div>
                   
                   <div className="space-y-3">
                     {collectionDetails.samples.map((sample: any, index: number) => (
-                      <Card key={index}>
+                      <Card key={index} className={selectedRecords.has(sample.id) ? "ring-2 ring-primary" : ""}>
                         <CardContent className="p-4">
                           <div className="space-y-2">
                             <div className="flex items-center justify-between">
-                              <p className="font-medium text-foreground">ID: {sample.id}</p>
-                              <span className="text-sm text-muted-foreground">
-                                Score: {sample.score?.toFixed(3) || 'N/A'}
-                              </span>
+                              <div className="flex items-center space-x-2">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedRecords.has(sample.id)}
+                                  onChange={() => toggleRecordSelection(sample.id)}
+                                  className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                                />
+                                <p className="font-medium text-foreground">ID: {sample.id}</p>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-sm text-muted-foreground">
+                                  Score: {sample.score?.toFixed(3) || 'N/A'}
+                                </span>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => deleteRecord(selectedCollection!, sample.id)}
+                                  className="text-destructive hover:text-destructive h-6 w-6 p-0"
+                                  title="Delete this record"
+                                >
+                                  ×
+                                </Button>
+                              </div>
                             </div>
                             
                             {sample.metadata && (

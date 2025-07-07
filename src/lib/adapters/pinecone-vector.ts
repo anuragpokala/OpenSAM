@@ -113,6 +113,30 @@ export class PineconeVectorAdapter implements VectorStoreAdapter {
     }
   }
 
+  async getVector(collection: string, id: string): Promise<Vector | null> {
+    try {
+      const index = await this.getIndex(collection);
+      
+      // Fetch the specific vector by ID
+      const fetchResponse = await index.fetch([id]);
+      
+      if (!fetchResponse.vectors || !fetchResponse.vectors[id]) {
+        return null;
+      }
+
+      const vectorData = fetchResponse.vectors[id];
+      
+      return {
+        id: vectorData.id,
+        values: vectorData.values || [],
+        metadata: vectorData.metadata || {}
+      };
+    } catch (error) {
+      console.error(`❌ Failed to get vector ${id} from index ${collection}:`, error);
+      return null;
+    }
+  }
+
   async delete(collection: string, ids?: string[]): Promise<void> {
     try {
       const index = await this.getIndex(collection);
