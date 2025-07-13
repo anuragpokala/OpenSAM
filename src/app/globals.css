@@ -248,6 +248,153 @@ pre code {
   @apply bg-transparent p-0;
 }
 
+/* Enhanced Chat Interface Styles */
+.chat-container {
+  @apply h-[calc(100vh-200px)] flex flex-col;
+}
+
+.chat-messages {
+  @apply flex-1 overflow-y-auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+}
+
+.chat-messages::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-messages::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.5);
+  border-radius: 3px;
+}
+
+.chat-messages::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(156, 163, 175, 0.7);
+}
+
+/* Message bubble animations */
+.message-bubble {
+  animation: messageSlideIn 0.3s ease-out;
+}
+
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Typing indicator animation */
+.typing-dots {
+  animation: typingDots 1.4s infinite;
+}
+
+@keyframes typingDots {
+  0%, 20% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+  80%, 100% {
+    transform: translateY(0);
+  }
+}
+
+/* Enhanced input area */
+.chat-input {
+  @apply transition-all duration-200;
+}
+
+.chat-input:focus-within {
+  @apply ring-2 ring-blue-500 ring-opacity-50;
+}
+
+/* Auto-resize textarea */
+.chat-textarea {
+  resize: none;
+  overflow-y: hidden;
+}
+
+/* Message actions hover effects */
+.message-actions button {
+  @apply transition-all duration-200;
+}
+
+.message-actions button:hover {
+  @apply scale-105;
+}
+
+/* Company profile selector animations */
+.company-profile-option {
+  @apply transition-all duration-200;
+}
+
+.company-profile-option:hover {
+  @apply transform scale-[1.02];
+}
+
+/* Enhanced loading states */
+.loading-spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Message timestamp fade */
+.message-timestamp {
+  @apply opacity-60 transition-opacity duration-200;
+}
+
+.message-timestamp:hover {
+  @apply opacity-100;
+}
+
+/* RAG context styling */
+.rag-context {
+  @apply animate-fade-in-up;
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Quick action buttons */
+.quick-action {
+  @apply transition-all duration-200 hover:shadow-md hover:scale-[1.02];
+}
+
+.quick-action:hover {
+  @apply border-blue-300;
+}
+
+/* Status indicators */
+.status-indicator {
+  @apply animate-pulse;
+}
+
 /* Enhanced markdown styling for chat */
 .chat-markdown {
   @apply text-sm leading-relaxed;
@@ -257,7 +404,7 @@ pre code {
 .chat-markdown h2,
 .chat-markdown h3,
 .chat-markdown h4 {
-  @apply font-semibold text-opensam-black mb-2;
+  @apply font-semibold text-gray-900 mb-2;
 }
 
 .chat-markdown h1 {
@@ -274,7 +421,7 @@ pre code {
 }
 
 .chat-markdown p {
-  @apply mb-2 last:mb-0;
+  @apply mb-2;
 }
 
 .chat-markdown ul,
@@ -286,37 +433,65 @@ pre code {
   @apply mb-1;
 }
 
+.chat-markdown code {
+  @apply bg-gray-100 rounded px-1 py-0.5 text-xs font-mono;
+}
+
+.chat-markdown pre {
+  @apply bg-gray-100 rounded p-3 overflow-x-auto mb-2;
+}
+
+.chat-markdown pre code {
+  @apply bg-transparent p-0;
+}
+
 .chat-markdown blockquote {
-  @apply border-l-4 border-opensam-black bg-opensam-gray-50 pl-3 py-1 italic;
-}
-
-.chat-markdown table {
-  @apply w-full border-collapse border border-opensam-gray-200 mb-3;
-}
-
-.chat-markdown th,
-.chat-markdown td {
-  @apply border border-opensam-gray-200 px-2 py-1 text-xs;
-}
-
-.chat-markdown th {
-  @apply font-semibold bg-opensam-gray-50;
+  @apply border-l-4 border-gray-300 pl-4 italic text-gray-600 mb-2;
 }
 
 .chat-markdown a {
-  @apply text-opensam-black underline hover:text-opensam-gray-600;
+  @apply text-blue-600 hover:text-blue-800 underline;
 }
 
-.chat-markdown strong {
-  @apply font-semibold;
+/* Responsive design for mobile */
+@media (max-width: 768px) {
+  .chat-container {
+    @apply h-[calc(100vh-150px)];
+  }
+  
+  .message-bubble {
+    @apply max-w-[90%];
+  }
+  
+  .quick-actions-grid {
+    @apply grid-cols-1;
+  }
 }
 
-.chat-markdown em {
-  @apply italic;
-}
-
-.chat-markdown hr {
-  @apply border-opensam-gray-200 my-3;
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .chat-markdown {
+    @apply text-gray-100;
+  }
+  
+  .chat-markdown h1,
+  .chat-markdown h2,
+  .chat-markdown h3,
+  .chat-markdown h4 {
+    @apply text-gray-100;
+  }
+  
+  .chat-markdown code {
+    @apply bg-gray-800 text-gray-100;
+  }
+  
+  .chat-markdown pre {
+    @apply bg-gray-800;
+  }
+  
+  .chat-markdown blockquote {
+    @apply border-gray-600 text-gray-300;
+  }
 }
 
 /* Focus states for accessibility */

@@ -126,6 +126,7 @@ interface AppStore extends AppState {
   addMessageToSession: (sessionId: string, message: ChatMessage) => void;
   updateMessageInSession: (sessionId: string, messageId: string, updates: Partial<ChatMessage>) => void;
   clearAllSessions: () => void;
+  importSessions: (sessions: ChatSession[]) => void;
   setIsStreaming: (isStreaming: boolean) => void;
   setPrepopulatedMessage: (message: string | null) => void;
   
@@ -248,10 +249,10 @@ export const useAppStore = create<AppStore>()(
       },
       
       // Chat Actions
-      createChatSession: (title) => {
+      createChatSession: () => {
         const session: ChatSession = {
           id: generateUUID(),
-          title: title || 'New Chat',
+          title: 'New Chat',
           messages: [],
           createdAt: Date.now(),
           updatedAt: Date.now(),
@@ -333,6 +334,12 @@ export const useAppStore = create<AppStore>()(
       
       clearAllSessions: () => 
         set({ chatSessions: [], currentSession: null }),
+      
+      importSessions: (sessions) => 
+        set((state) => ({
+          chatSessions: [...state.chatSessions, ...sessions],
+          currentSession: state.currentSession || (sessions.length > 0 ? sessions[0] : null),
+        })),
       
       setIsStreaming: (isStreaming) => 
         set({ isStreaming }),

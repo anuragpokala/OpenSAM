@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   MessageCircle, 
   Search, 
@@ -17,18 +17,22 @@ import {
   Download,
   RefreshCw,
   Database,
-  Building
+  Building,
+  Plus,
+  MessageSquare,
+  Clock
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 
-import { useAppStore, useUIState, useLLMConfig, useCompanyProfile, useIsCompanyProfileLoading } from '@/stores/appStore';
+import { useAppStore, useUIState, useLLMConfig, useCompanyProfile, useIsCompanyProfileLoading, useCurrentSession, useChatSessions } from '@/stores/appStore';
 import { cn, generateId } from '@/lib/utils';
 import SearchView from '@/components/SearchView';
 import CacheStatus from '@/components/CacheStatus';
 import { MarkdownRenderer } from '@/components/ui/markdown-renderer';
+import { ChatSessionManager } from '@/components/ChatSessionManager';
 import { CompanyProfile } from '@/types';
 
 // Add logo SVGs at the top (after imports)
@@ -656,15 +660,40 @@ function ChatView({
   savedProfiles: CompanyProfile[];
 }) {
   const [inputMessage, setInputMessage] = useState('');
-  const [messages, setMessages] = useState<Array<{role: 'user' | 'assistant', content: string}>>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showCompanySelector, setShowCompanySelector] = useState(false);
+  const [showSessionManager, setShowSessionManager] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   
   const llmConfig = useLLMConfig();
   const companyProfile = useCompanyProfile();
+  const currentSession = useCurrentSession();
+  const chatSessions = useChatSessions();
   const prepopulatedMessage = useAppStore((state) => state.prepopulatedMessage);
   const setPrepopulatedMessage = useAppStore((state) => state.setPrepopulatedMessage);
-  const { loadSavedProfiles, loadProfile } = useAppStore();
+  const { 
+    loadSavedProfiles, 
+    loadProfile, 
+    createChatSession, 
+    addMessageToSession,
+    updateSession 
+  } = useAppStore();
+
+  // Auto-scroll to bottom when new messages arrive
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [currentSession?.messages]);
+
+  // Initialize session if none exists
+  useEffect(() => {
+    if (!currentSession && chatSessions.length === 0) {
+      createChatSession(); // No title argument
+    }
+  }, [currentSession, chatSessions.length, createChatSession]);
 
   // Handle prepopulated message
   useEffect(() => {
@@ -702,10 +731,54 @@ function ChatView({
   }, [selectedCompanyProfile]);
 
   const sendMessage = async () => {
-    if (!inputMessage.trim() || !llmConfig.apiKey) return;
+    console.log('sendMessage called with:', { inputMessage, currentSession, llmConfig });
+    
+    if (!inputMessage.trim()) return;
+    
+    // Check if we have a current session, create one if not
+    let session = currentSession;
+    if (!session) {
+      console.log('No current session, creating new one...');
+      session = createChatSession(); // No title argument
+      if (!session) {
+        console.error('Failed to create new session');
+        return;
+      }
+      console.log('Created new session:', session);
+    }
+    
+    // Check for API key
+    if (!llmConfig.apiKey) {
+      const errorMessage = { 
+        role: 'assistant' as const, 
+        content: 'Please set your API key in the settings to start chatting.',
+        timestamp: Date.now(),
+        id: `msg_${Date.now()}_${Math.random()}`
+      };
+      addMessageToSession(session.id, errorMessage);
+      setInputMessage('');
+      return;
+    }
 
-    const userMessage = { role: 'user' as const, content: inputMessage };
-    setMessages(prev => [...prev, userMessage]);
+    const userMessage = { 
+      role: 'user' as const, 
+      content: inputMessage,
+      timestamp: Date.now(),
+      id: `msg_${Date.now()}_${Math.random()}`
+    };
+    
+    // Check if this is the first message for auto-title
+    const isFirstMessage = Array.isArray(session.messages) && session.messages.length === 0;
+    
+    // Add user message to current session
+    addMessageToSession(session.id, userMessage);
+    
+    // Auto-update session title if it's the first message and title is default
+    if (isFirstMessage && session.title === 'New Chat') {
+      const title = inputMessage.length > 30 ? inputMessage.substring(0, 30) + '...' : inputMessage;
+      updateSession(session.id, { title });
+    }
+    
     setInputMessage('');
     setIsLoading(true);
 
@@ -718,7 +791,7 @@ function ChatView({
         },
         body: JSON.stringify({
           model: `${llmConfig.provider}:${llmConfig.model}`,
-          messages: [...messages, userMessage],
+          messages: [...(Array.isArray(session.messages) ? session.messages : []), userMessage],
           companyProfile: selectedCompanyProfile, // Include selected company profile
           context: {
             temperature: llmConfig.temperature || 0.7,
@@ -737,9 +810,11 @@ function ChatView({
         const assistantMessage = { 
           role: 'assistant' as const, 
           content: data.data.content,
+          timestamp: Date.now(),
+          id: `msg_${Date.now()}_${Math.random()}`,
           ragContext: data.data.ragContext // Include RAG context if available
         };
-        setMessages(prev => [...prev, assistantMessage]);
+        addMessageToSession(session.id, assistantMessage);
       } else {
         throw new Error(data.error || 'Failed to get response');
       }
@@ -747,202 +822,396 @@ function ChatView({
       console.error('Chat error:', error);
       const errorMessage = { 
         role: 'assistant' as const, 
-        content: `Error: ${error instanceof Error ? error.message : 'Failed to send message'}` 
+        content: `Error: ${error instanceof Error ? error.message : 'Failed to send message'}`,
+        timestamp: Date.now(),
+        id: `msg_${Date.now()}_${Math.random()}`
       };
-      setMessages(prev => [...prev, errorMessage]);
+      addMessageToSession(session.id, errorMessage);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
+    console.log('handleKeyPress:', e.key, e.shiftKey);
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
+      console.log('Calling sendMessage from handleKeyPress');
       sendMessage();
     }
   };
 
+  const formatTimestamp = (timestamp: number) => {
+    return new Date(timestamp).toLocaleTimeString([], { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+  };
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      // You could add a toast notification here
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
+    }
+  };
+
   return (
-    <div className="max-w-4xl mx-auto">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center">
-                <MessageCircle className="h-5 w-5 mr-2" />
-                AI Chat Assistant
-              </CardTitle>
-              <CardDescription>
-                Ask questions about SAM.gov opportunities, get insights, and explore contract data.
-              </CardDescription>
-            </div>
+    <div className="max-w-5xl mx-auto chat-container">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 px-6 py-4 rounded-t-lg">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
+              <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse status-indicator"></div>
+              <h2 className="text-lg font-semibold text-gray-900">OpenSAM AI Assistant</h2>
+            </div>
+            
+            {/* Session Info */}
+            {currentSession && (
+              <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2 bg-gray-50 px-3 py-1 rounded-full">
+                  <MessageSquare className="h-4 w-4 text-gray-600" />
+                  <span className="text-sm font-medium text-gray-800">
+                    {currentSession.title}
+                  </span>
+                  {currentSession.messages.length > 0 && (
+                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                      {currentSession.messages.length}
+                    </span>
+                  )}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowSessionManager(true)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+            
+            {selectedCompanyProfile && (
+              <div className="flex items-center space-x-2 bg-blue-50 px-3 py-1 rounded-full">
+                <Building className="h-4 w-4 text-blue-600" />
+                <span className="text-sm font-medium text-blue-800">
+                  {selectedCompanyProfile.entityName}
+                </span>
+                <button
+                  onClick={() => setSelectedCompanyProfile(null)}
+                  className="text-blue-600 hover:text-blue-800"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            )}
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowSessionManager(true)}
+              className="text-sm"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              New Chat
+            </Button>
+            {!selectedCompanyProfile && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setShowCompanySelector(!showCompanySelector)}
+                className="text-sm"
               >
-                {selectedCompanyProfile ? (
-                  <>
-                    <Building className="h-4 w-4 mr-2" />
-                    {selectedCompanyProfile.entityName}
-                  </>
-                ) : (
-                  <>
-                    <Building className="h-4 w-4 mr-2" />
-                    Select Company
-                  </>
-                )}
+                <Building className="h-4 w-4 mr-2" />
+                Select Company
               </Button>
-              {selectedCompanyProfile && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSelectedCompanyProfile(null)}
-                  className="text-red-600 hover:text-red-700"
-                >
-                  Clear
-                </Button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Company Profile Selector */}
+      {showCompanySelector && (
+        <div className="bg-gray-50 border-b border-gray-200 px-6 py-4">
+          <div className="max-w-2xl">
+            <h4 className="font-medium text-gray-900 mb-3">Select Company Profile</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {savedProfiles.length > 0 ? (
+                savedProfiles.map((profile: CompanyProfile) => (
+                  <div
+                    key={profile.id}
+                                         className={`p-3 border rounded-lg cursor-pointer transition-all duration-200 company-profile-option ${
+                       selectedCompanyProfile?.id === profile.id
+                         ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
+                         : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
+                     }`}
+                    onClick={() => {
+                      setSelectedCompanyProfile(profile);
+                      setShowCompanySelector(false);
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <p className="font-medium text-gray-900">{profile.entityName || 'Unnamed Company'}</p>
+                        <p className="text-sm text-gray-600">
+                          {profile.naicsCodes?.length > 0 ? `NAICS: ${profile.naicsCodes.join(', ')}` : 'No NAICS codes'}
+                        </p>
+                      </div>
+                      {selectedCompanyProfile?.id === profile.id && (
+                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      )}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="col-span-full text-center py-4">
+                  <Building className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+                  <p className="text-sm text-gray-600">
+                    No saved company profiles found. Create one in the AI Company Profile section.
+                  </p>
+                </div>
               )}
             </div>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {/* Company Profile Selector */}
-            {showCompanySelector && (
-              <div className="p-4 border border-opensam-gray-200 rounded-lg bg-opensam-gray-50">
-                <h4 className="font-medium text-opensam-black mb-3">Select Company Profile</h4>
-                <div className="space-y-2">
-                  {savedProfiles.length > 0 ? (
-                    savedProfiles.map((profile: CompanyProfile) => (
-                      <div
-                        key={profile.id}
-                        className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                          selectedCompanyProfile?.id === profile.id
-                            ? 'border-opensam-black bg-opensam-black text-opensam-white'
-                            : 'border-opensam-gray-200 bg-opensam-white hover:border-opensam-gray-300'
-                        }`}
-                        onClick={() => {
-                          setSelectedCompanyProfile(profile);
-                          setShowCompanySelector(false);
-                        }}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <p className="font-medium">{profile.entityName || 'Unnamed Company'}</p>
-                            <p className="text-sm opacity-75">
-                              {profile.naicsCodes?.length > 0 ? `NAICS: ${profile.naicsCodes.join(', ')}` : 'No NAICS codes'}
-                            </p>
-                          </div>
-                          {selectedCompanyProfile?.id === profile.id && (
-                            <div className="w-2 h-2 bg-opensam-white rounded-full"></div>
-                          )}
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-sm text-opensam-gray-600">
-                      No saved company profiles found. Create one in the AI Company Profile section.
-                    </p>
-                  )}
+        </div>
+      )}
+
+      {/* Messages Container */}
+      <div className="chat-messages bg-gray-50 px-6 py-4">
+        <div className="max-w-4xl mx-auto">
+          {!currentSession || currentSession.messages.length === 0 ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+                  <Bot className="h-8 w-8 text-gray-400" />
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Welcome to OpenSAM AI</h3>
+                <p className="text-gray-600 mb-4 max-w-md">
+                  Ask me about SAM.gov opportunities, market trends, or get personalized recommendations for your company.
+                </p>
+                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-lg mx-auto quick-actions-grid">
+                   <button
+                     onClick={() => setInputMessage("What are the latest cybersecurity contract opportunities?")}
+                     className="p-3 text-left bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors quick-action"
+                   >
+                    <div className="font-medium text-gray-900">🔒 Cybersecurity</div>
+                    <div className="text-sm text-gray-600">Latest contract opportunities</div>
+                  </button>
+                                     <button
+                     onClick={() => setInputMessage("Show me small business set-aside opportunities in my area")}
+                     className="p-3 text-left bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors quick-action"
+                   >
+                     <div className="font-medium text-gray-900">🏢 Small Business</div>
+                     <div className="text-sm text-gray-600">Set-aside opportunities</div>
+                   </button>
+                   <button
+                     onClick={() => setInputMessage("What are the trending NAICS codes this quarter?")}
+                     className="p-3 text-left bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors quick-action"
+                   >
+                     <div className="font-medium text-gray-900">📊 Market Trends</div>
+                     <div className="text-sm text-gray-600">Trending NAICS codes</div>
+                   </button>
+                   <button
+                     onClick={() => setInputMessage("Help me understand the proposal requirements for this opportunity")}
+                     className="p-3 text-left bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors quick-action"
+                   >
+                     <div className="font-medium text-gray-900">📋 Proposal Help</div>
+                     <div className="text-sm text-gray-600">Requirements analysis</div>
+                   </button>
                 </div>
               </div>
-            )}
-
-            <div className="h-96 border border-opensam-gray-200 rounded-lg p-4 bg-opensam-gray-50 overflow-y-auto">
-              {messages.length === 0 ? (
-                <div className="flex items-center justify-center h-full text-opensam-gray-500">
-                  <div className="text-center">
-                    <Bot className="h-12 w-12 mx-auto mb-2 text-opensam-gray-400" />
-                    <p>Start a conversation with the AI assistant</p>
-                    <p className="text-sm mt-1">Try asking about recent contract opportunities or market trends</p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {currentSession?.messages.map((message, index) => (
+                <div key={message.id || index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[80%] lg:max-w-[70%] ${message.role === 'user' ? 'order-2' : 'order-1'}`}>
+                    <div className={`flex items-start space-x-3 ${message.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
+                                             {/* Avatar */}
+                       <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+                         message.role === 'user' 
+                           ? 'bg-blue-600 text-white' 
+                           : 'bg-gray-200 text-gray-700'
+                       }`}>
+                         {message.role === 'user' ? (
+                           <span className="text-sm font-medium">U</span>
+                         ) : (
+                           <Bot className="h-4 w-4" />
+                         )}
+                       </div>
+                       
+                       {/* Message Bubble */}
+                       <div className={`flex-1 ${message.role === 'user' ? 'text-right' : 'text-left'}`}>
+                         <div className={`inline-block p-4 rounded-2xl max-w-full message-bubble ${
+                           message.role === 'user' 
+                             ? 'bg-blue-600 text-white rounded-br-md' 
+                             : 'bg-white text-gray-900 rounded-bl-md shadow-sm border border-gray-100'
+                         }`}>
+                          {message.role === 'user' ? (
+                            <p className="text-sm leading-relaxed">{message.content}</p>
+                          ) : (
+                            <div className="text-sm leading-relaxed">
+                              <MarkdownRenderer content={message.content} />
+                                                             {/* Show RAG context if available */}
+                               {(message as any).ragContext && (
+                                 <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200 rag-context">
+                                   <div className="flex items-center space-x-2 mb-2">
+                                     <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                     <p className="text-xs font-medium text-blue-800">
+                                       Related Opportunities ({(message as any).ragContext.opportunities.length})
+                                     </p>
+                                   </div>
+                                   <div className="space-y-2">
+                                     {(message as any).ragContext.opportunities.slice(0, 3).map((item: any, oppIndex: number) => (
+                                       <div key={oppIndex} className="text-xs bg-white p-2 rounded border">
+                                         <p className="font-medium text-gray-900 flex items-center justify-between">
+                                           {item.opportunity.title}
+                                           <span className="px-2 py-0.5 bg-green-100 text-green-800 rounded-full text-[10px] font-semibold">
+                                             {item.score}% match
+                                           </span>
+                                         </p>
+                                         <p className="text-gray-600">
+                                           {item.opportunity.naicsCode}
+                                         </p>
+                                       </div>
+                                     ))}
+                                   </div>
+                                 </div>
+                               )}
+                            </div>
+                          )}
+                        </div>
+                        
+                                                 {/* Message Actions */}
+                         <div className={`flex items-center space-x-2 mt-2 message-actions ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                           {message.timestamp && (
+                             <span className="text-xs text-gray-500 message-timestamp">
+                               {formatTimestamp(message.timestamp)}
+                             </span>
+                           )}
+                           {message.role === 'assistant' && (
+                             <button
+                               onClick={() => copyToClipboard(message.content)}
+                               className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                               title="Copy message"
+                             >
+                               Copy
+                             </button>
+                           )}
+                         </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {messages.map((message, index) => (
-                    <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[80%] p-3 rounded-lg ${
-                        message.role === 'user' 
-                          ? 'bg-opensam-black text-opensam-white' 
-                          : 'bg-opensam-gray-200 text-opensam-black'
-                      }`}>
-                        {message.role === 'user' ? (
-                          <p className="text-sm">{message.content}</p>
-                        ) : (
-                          <div className="text-sm">
-                            <MarkdownRenderer content={message.content} />
-                            {/* Show RAG context if available */}
-                            {(message as any).ragContext && (
-                              <div className="mt-3 p-2 bg-opensam-gray-100 rounded border-l-4 border-opensam-black">
-                                <p className="text-xs font-medium text-opensam-black mb-2">
-                                  📊 Related Opportunities ({(message as any).ragContext.opportunities.length})
-                                </p>
-                                <div className="space-y-1">
-                                  {(message as any).ragContext.opportunities.slice(0, 3).map((item: any, oppIndex: number) => (
-                                    <div key={oppIndex} className="text-xs">
-                                      <p className="font-medium flex items-center">
-                                        {item.opportunity.title}
-                                        <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full text-[10px] font-semibold">
-                                          {item.score}% match
-                                        </span>
-                                      </p>
-                                      <p className="text-opensam-gray-600">
-                                        {item.opportunity.naicsCode}
-                                      </p>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
+              ))}
+              
+              {/* Loading Indicator */}
+              {isLoading && (
+                <div className="flex justify-start">
+                  <div className="max-w-[80%] lg:max-w-[70%]">
+                    <div className="flex items-start space-x-3">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
+                        <Bot className="h-4 w-4 text-gray-700" />
                       </div>
+                                             <div className="bg-white p-4 rounded-2xl rounded-bl-md shadow-sm border border-gray-100">
+                         <div className="flex items-center space-x-2">
+                           <div className="flex space-x-1 typing-dots">
+                             <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                             <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                             <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                           </div>
+                           <span className="text-sm text-gray-600">AI is thinking...</span>
+                         </div>
+                       </div>
                     </div>
-                  ))}
-                  {isLoading && (
-                    <div className="flex justify-start">
-                      <div className="bg-opensam-gray-200 text-opensam-black p-3 rounded-lg">
-                        <div className="flex items-center space-x-2">
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-opensam-black"></div>
-                          <span className="text-sm">AI is thinking...</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  </div>
                 </div>
               )}
             </div>
-            <div className="flex space-x-2">
-              <Input
-                placeholder="Ask about SAM.gov opportunities..."
-                className="flex-1"
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-                onKeyPress={handleKeyPress}
-                disabled={isLoading || !llmConfig.apiKey}
-              />
-              <Button 
-                onClick={sendMessage}
-                disabled={isLoading || !inputMessage.trim() || !llmConfig.apiKey}
-              >
-                {isLoading ? 'Sending...' : 'Send'}
-              </Button>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+      </div>
+
+      {/* Chat Session Manager */}
+      <ChatSessionManager 
+        isOpen={showSessionManager} 
+        onClose={() => setShowSessionManager(false)} 
+      />
+
+      {/* Input Area */}
+      <div className="bg-white border-t border-gray-200 px-6 py-4 rounded-b-lg">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-end space-x-3">
+            <div className="flex-1">
+                             <div className="relative chat-input">
+                 <textarea
+                   placeholder="Ask about SAM.gov opportunities, market trends, or get personalized recommendations..."
+                   className="w-full p-4 pr-12 border border-gray-300 rounded-xl resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 chat-textarea"
+                   rows={1}
+                   value={inputMessage}
+                   onChange={(e) => setInputMessage(e.target.value)}
+                   onKeyPress={handleKeyPress}
+                   disabled={isLoading}
+                   style={{ minHeight: '48px', maxHeight: '120px' }}
+                 />
+                <div className="absolute bottom-3 right-3 flex items-center space-x-2">
+                  <span className="text-xs text-gray-400">
+                    {inputMessage.length}/1000
+                  </span>
+                </div>
+              </div>
             </div>
-            {!llmConfig.apiKey && (
-              <p className="text-sm text-red-500 text-center">
-                Please set your API key in the sidebar to start chatting
-              </p>
-            )}
-            {!selectedCompanyProfile && (
-              <p className="text-sm text-blue-600 text-center">
-                💡 Select a company profile above to get personalized opportunity recommendations
-              </p>
-            )}
+            <Button 
+              onClick={() => {
+                console.log('Send button clicked');
+                sendMessage();
+              }}
+              disabled={isLoading || !inputMessage.trim()}
+              className="px-6 py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+            >
+                             {isLoading ? (
+                 <div className="flex items-center space-x-2">
+                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin loading-spinner"></div>
+                   <span>Sending...</span>
+                 </div>
+               ) : (
+                <div className="flex items-center space-x-2">
+                  <span>Send</span>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  </svg>
+                </div>
+              )}
+            </Button>
           </div>
-        </CardContent>
-      </Card>
+          
+          {!llmConfig.apiKey && (
+            <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className="flex items-center space-x-2">
+                <Key className="h-4 w-4 text-yellow-500" />
+                <span className="text-sm text-yellow-700">
+                  💡 Set your API key in the sidebar to start chatting with AI
+                </span>
+              </div>
+            </div>
+          )}
+          
+          {!selectedCompanyProfile && (
+            <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center space-x-2">
+                <Building className="h-4 w-4 text-blue-500" />
+                <span className="text-sm text-blue-700">
+                  💡 Select a company profile above to get personalized opportunity recommendations
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

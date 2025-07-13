@@ -1,12 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { LLMProvider, LLMMessage, LLMResponse, CompanyProfile } from '@/types';
 import { vectorStoreServerUtils } from '@/lib/vectorStore-server';
-import { chatWithRAG, findMatchingOpportunities } from '@/lib/chat-rag';
+import { chatWithRAG, findMatchingOpportunities, RAGContext } from '@/lib/chat-rag';
+// Removed: import { rateLimit } from '@/lib/utils';
 
 // Rate limiting configuration
-const RATE_LIMIT_WINDOW = 60000; // 1 minute
-const RATE_LIMIT_MAX_REQUESTS = 20;
+// Remove limiter and use local rate limit config/vars
 const rateLimitMap = new Map<string, { count: number; timestamp: number }>();
+const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
+const RATE_LIMIT_MAX_REQUESTS = 10; // 10 requests per window
+
+/**
+ * Rate limiting middleware
+ */
+function checkRateLimit(req: NextRequest): boolean {
+  const clientIp = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
+  const now = Date.now();
+  
+  const clientData = rateLimitMap.get(clientIp as string);
+  
+  if (!clientData) {
+    rateLimitMap.set(clientIp as string, { count: 1, timestamp: now });
+    return true;
+  }
+  
+  // Reset if window has passed
+  if (now - clientData.timestamp > RATE_LIMIT_WINDOW) {
+    rateLimitMap.set(clientIp as string, { count: 1, timestamp: now });
+    return true;
+  }
+  
+  // Check if limit exceeded
+  if (clientData.count >= RATE_LIMIT_MAX_REQUESTS) {
+    return false;
+  }
+  
+  // Increment count
+  clientData.count++;
+  return true;
+}
 
 // LLM Provider configurations
 const LLM_CONFIGS = {
@@ -53,36 +85,6 @@ When users ask about contracting opportunities, provide detailed, accurate infor
 Keep responses concise but comprehensive, and always consider the business context of government contracting.
 
 You have access to a local vector database of SAM.gov opportunities, entities, and chat history. Use this context to provide more relevant and personalized responses.`;
-
-/**
- * Rate limiting middleware
- */
-function checkRateLimit(req: NextRequest): boolean {
-  const clientIp = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
-  const now = Date.now();
-  
-  const clientData = rateLimitMap.get(clientIp as string);
-  
-  if (!clientData) {
-    rateLimitMap.set(clientIp as string, { count: 1, timestamp: now });
-    return true;
-  }
-  
-  // Reset if window has passed
-  if (now - clientData.timestamp > RATE_LIMIT_WINDOW) {
-    rateLimitMap.set(clientIp as string, { count: 1, timestamp: now });
-    return true;
-  }
-  
-  // Check if limit exceeded
-  if (clientData.count >= RATE_LIMIT_MAX_REQUESTS) {
-    return false;
-  }
-  
-  // Increment count
-  clientData.count++;
-  return true;
-}
 
 /**
  * Format messages for OpenAI API
@@ -259,186 +261,124 @@ async function callHuggingFace(
 /**
  * Main chat API handler
  */
-export async function POST(req: NextRequest) {
-  // Check rate limit
-  if (!checkRateLimit(req)) {
-    return NextResponse.json({ 
-      error: 'Rate limit exceeded. Please try again later.' 
-    }, { status: 429 });
-  }
-  
+export async function POST(request: NextRequest) {
   try {
-    const { model, messages, context, companyProfile } = await req.json();
-    
-    // Validate input
-    if (!model || !messages || !Array.isArray(messages)) {
-      return NextResponse.json({ 
-        error: 'Invalid request. Model and messages are required.' 
-      }, { status: 400 });
-    }
-    
-    // Parse provider and model
-    const [provider, modelName] = model.split(':');
-    
-    if (!provider || !modelName) {
-      return NextResponse.json({ 
-        error: 'Invalid model format. Use "provider:model" format.' 
-      }, { status: 400 });
-    }
-    
-    // Validate provider
-    if (!['openai', 'anthropic', 'huggingface'].includes(provider)) {
-      return NextResponse.json({ 
-        error: 'Invalid provider. Supported providers: openai, anthropic, huggingface.' 
-      }, { status: 400 });
-    }
-    
-    // Get API key from headers, context, or server environment
-    let apiKey = req.headers.get('authorization')?.replace('Bearer ', '') || 
-                 context?.apiKey;
-    
-    // If API key is "server-configured", use environment variable
-    if (apiKey === 'server-configured') {
-      apiKey = process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.HUGGINGFACE_API_KEY || '';
-    }
-    
-    if (!apiKey) {
-      return NextResponse.json({ 
-        error: 'API key is required.' 
-      }, { status: 401 });
-    }
-    
-    // Test mode for validation
-    if (context?.test) {
-      return NextResponse.json({ 
-        success: true, 
-        message: 'API key validation successful' 
-      }, { status: 200 });
-    }
-    
-    // Call appropriate LLM provider with RAG if company profile is provided
-    let response: LLMResponse;
-    
-    if (companyProfile) {
-      // Use RAG with company profile
-      const ragResult = await chatWithRAG(
-        messages[messages.length - 1].content, // Get the last user message
-        companyProfile,
-        async (systemPrompt: string, userPrompt: string) => {
-          // Create a custom LLM function that uses the selected provider
-          const ragMessages = [
-            { role: 'system' as const, content: systemPrompt },
-            { role: 'user' as const, content: userPrompt }
-          ];
-          
-          switch (provider as LLMProvider) {
-            case 'openai':
-              const openaiResponse = await callOpenAI(
-                ragMessages, 
-                modelName, 
-                apiKey, 
-                context?.temperature, 
-                context?.maxTokens
-              );
-              return openaiResponse.content;
-              
-            case 'anthropic':
-              const anthropicResponse = await callAnthropic(
-                ragMessages, 
-                modelName, 
-                apiKey, 
-                context?.temperature, 
-                context?.maxTokens
-              );
-              return anthropicResponse.content;
-              
-            case 'huggingface':
-              const huggingfaceResponse = await callHuggingFace(
-                ragMessages, 
-                modelName, 
-                apiKey, 
-                context?.temperature, 
-                context?.maxTokens
-              );
-              return huggingfaceResponse.content;
-              
-            default:
-              throw new Error(`Unsupported provider: ${provider}`);
-          }
-        }
+    console.log('🔍 Chat API called');
+    // Use local checkRateLimit instead of limiter
+    if (!checkRateLimit(request)) {
+      console.log('❌ Rate limit exceeded');
+      return NextResponse.json(
+        { error: 'Rate limit exceeded. Please try again later.' },
+        { status: 429 }
       );
-      
-      // Create response with RAG context
-      response = {
-        content: ragResult.response,
-        usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
-        model: modelName,
-        provider: provider as LLMProvider,
-        ragContext: {
-          opportunities: ragResult.opportunities,
-          companyProfile: companyProfile
-        }
-      };
-    } else {
-      // Standard chat without RAG
-      switch (provider as LLMProvider) {
-        case 'openai':
-          response = await callOpenAI(
-            messages, 
-            modelName, 
-            apiKey, 
-            context?.temperature, 
-            context?.maxTokens
-          );
-          break;
-          
-        case 'anthropic':
-          response = await callAnthropic(
-            messages, 
-            modelName, 
-            apiKey, 
-            context?.temperature, 
-            context?.maxTokens
-          );
-          break;
-          
-        case 'huggingface':
-          response = await callHuggingFace(
-            messages, 
-            modelName, 
-            apiKey, 
-            context?.temperature, 
-            context?.maxTokens
-          );
-          break;
-          
-        default:
-          throw new Error(`Unsupported provider: ${provider}`);
-      }
     }
-    
-    // Return response
+
+    const body = await request.json();
+    console.log('📝 Request body:', { 
+      model: body.model, 
+      messagesCount: body.messages?.length,
+      hasCompanyProfile: !!body.companyProfile 
+    });
+
+    const { model, messages, companyProfile, context } = body;
+
+    if (!model || !messages || !Array.isArray(messages)) {
+      console.log('❌ Invalid request parameters');
+      return NextResponse.json(
+        { error: 'Invalid request parameters' },
+        { status: 400 }
+      );
+    }
+
+    // Extract provider and model from the model string
+    const [provider, modelName] = model.split(':');
+    console.log('🤖 Provider:', provider, 'Model:', modelName);
+
+    // Determine API key: prefer user-provided, else use server-side env var
+    let apiKey: string | undefined;
+    if (provider === 'openai') {
+      apiKey = body.apiKey || process.env.OPENAI_API_KEY;
+    } else if (provider === 'anthropic') {
+      apiKey = body.apiKey || process.env.ANTHROPIC_API_KEY;
+    } else if (provider === 'huggingface') {
+      apiKey = body.apiKey || process.env.HUGGINGFACE_API_KEY;
+    }
+    if (!apiKey) {
+      return NextResponse.json({ error: 'No API key provided for selected provider.' }, { status: 400 });
+    }
+
+    console.log('✅ API key provided, proceeding with chat request');
+
+    // Remove mock response, use real AI + RAG logic
+    let aiResponse = '';
+    let ragContext: RAGContext | null = null;
+    try {
+      if (companyProfile) {
+        // Use RAG flow
+        const llmFunction = async (systemPrompt: string, userPrompt: string) => {
+          if (provider === 'openai') {
+            const result = await callOpenAI([
+              { role: 'system', content: systemPrompt },
+              ...messages.map((msg: any) => ({ role: msg.role, content: msg.content }))
+            ], modelName, apiKey, context?.temperature, context?.maxTokens);
+            return result.content;
+          } else if (provider === 'anthropic') {
+            const result = await callAnthropic([
+              { role: 'system', content: systemPrompt },
+              ...messages.map((msg: any) => ({ role: msg.role, content: msg.content }))
+            ], modelName, apiKey, context?.temperature, context?.maxTokens);
+            return result.content;
+          } else if (provider === 'huggingface') {
+            const result = await callHuggingFace([
+              { role: 'system', content: systemPrompt },
+              ...messages.map((msg: any) => ({ role: msg.role, content: msg.content }))
+            ], modelName, apiKey, context?.temperature, context?.maxTokens);
+            return result.content;
+          } else {
+            throw new Error('Unsupported provider');
+          }
+        };
+        const ragResult = await chatWithRAG(
+          messages[messages.length - 1]?.content || '',
+          companyProfile,
+          llmFunction
+        );
+        aiResponse = ragResult.response;
+        ragContext = ragResult.context;
+      } else {
+        // No company profile, just chat
+        if (provider === 'openai') {
+          const result = await callOpenAI(messages, modelName, apiKey, context?.temperature, context?.maxTokens);
+          aiResponse = result.content;
+        } else if (provider === 'anthropic') {
+          const result = await callAnthropic(messages, modelName, apiKey, context?.temperature, context?.maxTokens);
+          aiResponse = result.content;
+        } else if (provider === 'huggingface') {
+          const result = await callHuggingFace(messages, modelName, apiKey, context?.temperature, context?.maxTokens);
+          aiResponse = result.content;
+        } else {
+          throw new Error('Unsupported provider');
+        }
+      }
+    } catch (err) {
+      console.error('❌ AI chat error:', err);
+      return NextResponse.json({ error: 'AI chat error: ' + (err instanceof Error ? err.message : String(err)) }, { status: 500 });
+    }
+
     return NextResponse.json({
       success: true,
-      data: response,
-      timestamp: Date.now(),
-    }, { status: 200 });
-    
+      data: {
+        content: aiResponse,
+        ragContext: ragContext
+      }
+    });
+
   } catch (error) {
-    console.error('Chat API error:', error);
-    
-    // Return appropriate error response
-    if (error instanceof Error) {
-      return NextResponse.json({ 
-        error: error.message,
-        timestamp: Date.now(),
-      }, { status: 500 });
-    } else {
-      return NextResponse.json({ 
-        error: 'An unexpected error occurred',
-        timestamp: Date.now(),
-      }, { status: 500 });
-    }
+    console.error('❌ Chat API error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }
 
