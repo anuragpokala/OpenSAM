@@ -262,6 +262,25 @@
             line-height: 1.5;
         }
 
+        .waitlist {
+            display: inline-block;
+            background: #000;
+            color: #fff;
+            padding: 1rem 2rem;
+            border-radius: 0.5rem;
+            font-size: 1.2rem;
+            font-weight: 600;
+            text-align: center;
+            margin: 1.5rem 0;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            transition: background 0.2s, transform 0.2s;
+        }
+        .waitlist:hover {
+            background: #222;
+            transform: translateY(-2px) scale(1.03);
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 1rem;
@@ -305,7 +324,9 @@
         <h1 class="logo">OpenSAM AI</h1>
         <p class="tagline">Hosted Version, Coming soon. Contact Us for Early Access contact@vonar.ai</p>
         
-        <div class="coming-soon">🚀 Coming Soon</div>
+        <a href="https://docs.google.com/forms/d/e/1FAIpQLSd82WSB93ZgwiG1lw6FVCNxHgrDSQNXZcgRPP2g29Lt7E-lgg/viewform?usp=header" target="_blank" rel="noopener noreferrer">
+            <div class="waitlist">📝 Join our waitlist!</div>
+        </a>
         
         <div class="cta-section">
             <h2 class="cta-title">Open Source & Ready to Contribute</h2>
