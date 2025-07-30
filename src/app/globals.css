@@ -51,39 +51,39 @@
   }
 
   .dark {
-    --background: 0 0% 4%;
+    --background: 0 0% 10%;
     --foreground: 0 0% 98%;
 
-    --card: 0 0% 4%;
+    --card: 0 0% 12%;
     --card-foreground: 0 0% 98%;
 
-    --popover: 0 0% 4%;
+    --popover: 0 0% 12%;
     --popover-foreground: 0 0% 98%;
 
     --primary: 0 0% 98%;
     --primary-foreground: 0 0% 9%;
 
-    --secondary: 0 0% 15%;
+    --secondary: 0 0% 18%;
     --secondary-foreground: 0 0% 98%;
 
-    --muted: 0 0% 15%;
+    --muted: 0 0% 18%;
     --muted-foreground: 0 0% 64%;
 
-    --accent: 0 0% 15%;
+    --accent: 0 0% 18%;
     --accent-foreground: 0 0% 98%;
 
     --destructive: 0 62% 30%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 0 0% 15%;
-    --input: 0 0% 15%;
+    --border: 0 0% 20%;
+    --input: 0 0% 18%;
     --ring: 0 0% 83%;
 
     /* OpenSAM dark mode colors */
     --opensam-black: 0 0% 98%;
-    --opensam-white: 0 0% 4%;
-    --opensam-gray-50: 0 0% 9%;
-    --opensam-gray-100: 0 0% 15%;
+    --opensam-white: 0 0% 12%;
+    --opensam-gray-50: 0 0% 15%;
+    --opensam-gray-100: 0 0% 18%;
     --opensam-gray-200: 0 0% 25%;
     --opensam-gray-300: 0 0% 35%;
     --opensam-gray-400: 0 0% 45%;
@@ -469,29 +469,27 @@ pre code {
 }
 
 /* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .chat-markdown {
-    @apply text-gray-100;
-  }
-  
-  .chat-markdown h1,
-  .chat-markdown h2,
-  .chat-markdown h3,
-  .chat-markdown h4 {
-    @apply text-gray-100;
-  }
-  
-  .chat-markdown code {
-    @apply bg-gray-800 text-gray-100;
-  }
-  
-  .chat-markdown pre {
-    @apply bg-gray-800;
-  }
-  
-  .chat-markdown blockquote {
-    @apply border-gray-600 text-gray-300;
-  }
+.dark .chat-markdown {
+  @apply text-foreground;
+}
+
+.dark .chat-markdown h1,
+.dark .chat-markdown h2,
+.dark .chat-markdown h3,
+.dark .chat-markdown h4 {
+  @apply text-foreground;
+}
+
+.dark .chat-markdown code {
+  @apply bg-muted text-foreground;
+}
+
+.dark .chat-markdown pre {
+  @apply bg-muted;
+}
+
+.dark .chat-markdown blockquote {
+  @apply border-border text-muted-foreground;
 }
 
 /* Focus states for accessibility */

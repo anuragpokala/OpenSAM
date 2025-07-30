@@ -34,9 +34,10 @@ export function CacheIndicator({
         ${isSubtle ? 'opacity-60 hover:opacity-100' : 'opacity-80'}
         transition-opacity duration-200 
         text-xs 
-        bg-blue-50 
-        text-blue-700 
-        border-blue-200
+        bg-blue-500/10 
+        text-blue-600 
+        dark:text-blue-400
+        border-blue-500/20
         ${className}
       `}
       title={`Data served from cache${timestamp ? ` at ${formatTimestamp(timestamp)}` : ''}`}
@@ -58,16 +59,16 @@ export function CacheNotification({
   return (
     <div className={`
       flex items-center justify-between 
-      bg-blue-50 border border-blue-200 
+      bg-blue-500/10 border border-blue-500/20 
       rounded-md px-3 py-2 text-sm 
-      text-blue-800
+      text-blue-600 dark:text-blue-400
       ${className}
     `}>
       <div className="flex items-center gap-2">
         <Clock className="h-4 w-4" />
         <span>Data served from cache for faster loading</span>
         {timestamp && (
-          <span className="text-blue-600 text-xs">
+          <span className="text-blue-500 dark:text-blue-300 text-xs">
             • {new Date(timestamp).toLocaleTimeString()}
           </span>
         )}
@@ -75,7 +76,7 @@ export function CacheNotification({
       {onDismiss && (
         <button 
           onClick={onDismiss}
-          className="text-blue-600 hover:text-blue-800 ml-2"
+          className="text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 ml-2"
           aria-label="Dismiss notification"
         >
           ×
