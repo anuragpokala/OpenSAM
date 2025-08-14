@@ -19,7 +19,8 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
-  Hash
+  Hash,
+  TrendingUp
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -282,6 +283,16 @@ export default function SearchView() {
     endDate: ''
   });
   
+  // Sorting state
+  const [sortByMatch, setSortByMatch] = useState(false);
+  
+  // Match calculation progress
+  const [matchCalculationProgress, setMatchCalculationProgress] = useState({
+    total: 0,
+    completed: 0,
+    isCalculating: false
+  });
+  
   const searchResults = useSearchResults();
   const searchFilters = useSearchFilters();
   const workingLists = useWorkingLists();
@@ -317,12 +328,19 @@ export default function SearchView() {
     setCurrentPage(1);
   }, [searchQuery, titleSearch, naicsSearch, advancedFilters]);
 
+  // Auto-hide preset queries when search results first appear
+  useEffect(() => {
+    if (searchResults.length > 0 && !isSearching && showPresets) {
+      setShowPresets(false);
+    }
+  }, [searchResults.length, isSearching, showPresets]);
+
   // Perform search with enhanced filters and pagination
   const performSearch = async (page: number = 1) => {
     // Check if SAM API key is configured
     const samApiKey = process.env.NEXT_PUBLIC_SAM_API_KEY;
     if (!samApiKey) {
-      alert('SAM.gov API key is not configured. Please set NEXT_PUBLIC_SAM_API_KEY in your environment variables.');
+      alert('SAM.gov API key is not configured. Please set SAM_API_KEY in your environment variables.');
       return;
     }
     
@@ -395,8 +413,9 @@ export default function SearchView() {
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
-          setSearchResults(data.data.opportunities);
-          setTotalResults(data.data.totalRecords || data.data.opportunities.length);
+          const opportunities = data.data.opportunities;
+          setSearchResults(opportunities);
+          setTotalResults(data.data.totalRecords || opportunities.length);
           setCurrentPage(page);
           
           // Track cache status
@@ -404,6 +423,29 @@ export default function SearchView() {
           // Reset cache notification dismissal for new searches
           if (data.cached && cacheNotificationDismissed) {
             useAppStore.setState({ cacheNotificationDismissed: false });
+          }
+          
+          // Automatically calculate matches for all opportunities if company profile exists
+          if (companyProfile && opportunities.length > 0) {
+            console.log(`🔄 Auto-calculating matches for ${opportunities.length} opportunities...`);
+            // Clear previous matches
+            setOpportunityMatches({});
+            setLoadingMatches(new Set());
+            
+            // Set up progress tracking
+            setMatchCalculationProgress({
+              total: opportunities.length,
+              completed: 0,
+              isCalculating: true
+            });
+            
+            // Enable sorting by match by default when matches are being calculated
+            setSortByMatch(true);
+            
+            // Calculate matches for all opportunities
+            opportunities.forEach(opportunity => {
+              calculateCompanyMatch(opportunity.id);
+            });
           }
         } else {
           console.error('Search API error:', data.error);
@@ -415,10 +457,6 @@ export default function SearchView() {
         alert(`Search failed: ${errorData.error || 'Unknown error'}`);
       }
       
-      // Clear any existing opportunity matches when performing new search
-      setOpportunityMatches({});
-      setLoadingMatches(new Set());
-      
     } catch (error) {
       console.error('Search error:', error);
       alert('Search failed. Please check your internet connection and try again.');
@@ -429,6 +467,8 @@ export default function SearchView() {
 
   // Handle search button click
   const handleSearch = () => {
+    // Hide preset queries panel so results are immediately visible
+    setShowPresets(false);
     performSearch(1);
   };
 
@@ -451,6 +491,9 @@ export default function SearchView() {
     const displayQuery = queryParts.join(' | ');
     setSearchQuery(displayQuery);
     setStoreSearchQuery(displayQuery);
+    
+    // Hide preset queries panel so results are immediately visible
+    setShowPresets(false);
     
     // Perform search
     setTimeout(() => performSearch(1), 100);
@@ -480,7 +523,7 @@ ${preset.message}`;
     
     // Set the prepopulated message and navigate to chat
     setPrepopulatedMessage(message);
-    setCurrentView('chat');
+    
   };
 
   // Add opportunity to working list
@@ -564,6 +607,13 @@ ${preset.message}`;
             ...prev,
             [opportunityId]: data.data.matchScore
           }));
+          
+          // Update progress
+          setMatchCalculationProgress(prev => ({
+            ...prev,
+            completed: prev.completed + 1,
+            isCalculating: prev.completed + 1 < prev.total
+          }));
         }
       }
     } catch (error) {
@@ -600,6 +650,9 @@ ${preset.message}`;
     // Test title search
     setTitleSearch('software development');
     setNaicsSearch('541511');
+    
+    // Hide preset queries panel so results are immediately visible
+    setShowPresets(false);
     
     // Perform test search
     setTimeout(() => {
@@ -729,6 +782,60 @@ ${preset.message}`;
                 <Sparkles className="h-4 w-4 mr-2" />
                 Preset Queries
               </Button>
+              
+              {searchResults.length > 0 && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => {
+                    setSearchResults([]);
+                    setTotalResults(0);
+                    setCurrentPage(1);
+                    setShowPresets(true);
+                  }}
+                  disabled={isSearching}
+                >
+                  <Search className="h-4 w-4 mr-2" />
+                  New Search
+                </Button>
+              )}
+              
+              {searchResults.length > 0 && Object.keys(opportunityMatches).length > 0 && (
+                <Button 
+                  variant={sortByMatch ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSortByMatch(!sortByMatch)}
+                  disabled={isSearching}
+                >
+                  <TrendingUp className="h-4 w-4 mr-2" />
+                  {sortByMatch ? "Sorted by Match" : "Sort by Match"}
+                </Button>
+              )}
+              
+              {searchResults.length > 0 && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => {
+                    setSearchResults([]);
+                    setTotalResults(0);
+                    setCurrentPage(1);
+                    setSearchQuery('');
+                    setStoreSearchQuery('');
+                    setTitleSearch('');
+                    setNaicsSearch('');
+                    setAdvancedFilters({
+                      startDate: '',
+                      endDate: ''
+                    });
+                    setShowPresets(true);
+                  }}
+                  disabled={isSearching}
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Clear Search
+                </Button>
+              )}
               
               <Button 
                 variant="outline" 
@@ -911,6 +1018,11 @@ ${preset.message}`;
                 </h2>
                 <p className="text-sm text-muted-foreground">
                   Showing {((currentPage - 1) * resultsPerPage) + 1} to {Math.min(currentPage * resultsPerPage, totalResults)} of {totalResults} opportunities
+                  {Object.keys(opportunityMatches).length > 0 && (
+                    <span className="ml-2 text-blue-600">
+                      • {sortByMatch ? "Sorted by match percentage (highest first)" : "Click 'Sort by Match' to sort by percentage"}
+                    </span>
+                  )}
                 </p>
               </div>
               {lastSearchCached && (
@@ -941,22 +1053,60 @@ ${preset.message}`;
             )}
           </div>
 
-          <div className="grid gap-4">
-            {searchResults.map((opportunity) => (
-              <OpportunityCard
-                key={opportunity.id}
-                opportunity={opportunity}
-                isSelected={selectedOpportunities.includes(opportunity.id)}
-                onToggleSelection={() => toggleOpportunitySelection(opportunity.id)}
-                onAddToWorkingList={() => handleAddToWorkingList(opportunity)}
-                onToggleFavorite={() => toggleFavorite(opportunity.id)}
-                onPresetMessage={(preset) => handlePresetMessage(preset, opportunity)}
-                companyProfile={companyProfile}
-                opportunityMatches={opportunityMatches}
-                loadingMatches={loadingMatches}
-                calculateCompanyMatch={calculateCompanyMatch}
-              />
-            ))}
+          {/* Match Calculation Progress */}
+          {matchCalculationProgress.isCalculating && companyProfile && (
+            <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                  <span className="text-sm font-medium text-blue-800">
+                    Calculating company matches...
+                  </span>
+                </div>
+                <span className="text-sm text-blue-600">
+                  {matchCalculationProgress.completed} / {matchCalculationProgress.total}
+                </span>
+              </div>
+              <div className="w-full bg-blue-200 rounded-full h-2">
+                <div 
+                  className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${(matchCalculationProgress.completed / matchCalculationProgress.total) * 100}%` }}
+                ></div>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {searchResults
+              .map(opportunity => ({
+                ...opportunity,
+                matchScore: opportunityMatches[opportunity.id] || 0
+              }))
+              .sort((a, b) => {
+                // Only sort by match if sorting is enabled and there are match scores
+                if (sortByMatch && Object.keys(opportunityMatches).length > 0) {
+                  if (b.matchScore !== a.matchScore) {
+                    return b.matchScore - a.matchScore;
+                  }
+                }
+                // Default sort by title alphabetically
+                return a.title.localeCompare(b.title);
+              })
+              .map((opportunity) => (
+                <OpportunityCard
+                  key={opportunity.id}
+                  opportunity={opportunity}
+                  isSelected={selectedOpportunities.includes(opportunity.id)}
+                  onToggleSelection={() => toggleOpportunitySelection(opportunity.id)}
+                  onAddToWorkingList={() => handleAddToWorkingList(opportunity)}
+                  onToggleFavorite={() => toggleFavorite(opportunity.id)}
+                  onPresetMessage={(preset) => handlePresetMessage(preset, opportunity)}
+                  companyProfile={companyProfile}
+                  opportunityMatches={opportunityMatches}
+                  loadingMatches={loadingMatches}
+                  calculateCompanyMatch={calculateCompanyMatch}
+                />
+              ))}
           </div>
 
           {/* Pagination */}
@@ -1003,7 +1153,7 @@ ${preset.message}`;
                 </p>
                 <div className="text-xs text-yellow-600">
                   <p>1. Create a <code>.env.local</code> file in the project root</p>
-                  <p>2. Add: <code>NEXT_PUBLIC_SAM_API_KEY=your_api_key_here</code></p>
+                  <p>2. Add: <code>SAM_API_KEY=your_api_key_here</code></p>
                   <p>3. Restart the development server</p>
                   <p>See <code>SEARCH_SETUP.md</code> for detailed instructions.</p>
                 </div>
@@ -1042,8 +1192,8 @@ function OpportunityCard({
 }) {
   return (
     <Card className={`${isSelected ? 'ring-2 ring-blue-500' : ''}`}>
-      <CardContent className="p-6">
-        <div className="flex items-start justify-between mb-4">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between mb-3">
           <div className="flex-1">
             <div className="flex items-center space-x-2 mb-2">
               <input
@@ -1052,10 +1202,10 @@ function OpportunityCard({
                 onChange={onToggleSelection}
                 className="rounded"
               />
-              <h3 className="text-lg font-semibold line-clamp-2">{opportunity.title}</h3>
+              <h3 className="text-base font-semibold line-clamp-2">{opportunity.title}</h3>
             </div>
             
-            <div className="flex flex-wrap gap-2 mb-3">
+            <div className="flex flex-wrap gap-2 mb-2">
               <Badge variant="outline">{opportunity.naicsCode}</Badge>
               <Badge variant="outline">{opportunity.type}</Badge>
               {opportunity.placeOfPerformance?.state?.name && (
@@ -1071,9 +1221,9 @@ function OpportunityCard({
                 </Badge>
               )}
               {/* Company Profile Match */}
-              {companyProfile && (
-                <div className="flex items-center space-x-2">
-                  {loadingMatches.has(opportunity.id) ? (
+              <div className="flex items-center space-x-2">
+                {companyProfile ? (
+                  loadingMatches.has(opportunity.id) ? (
                     <Badge variant="outline" className="bg-blue-50 text-blue-700">
                       <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 mr-1"></div>
                       Calculating...
@@ -1092,22 +1242,21 @@ function OpportunityCard({
                       {Math.round(opportunityMatches[opportunity.id] * 100)}% Match
                     </Badge>
                   ) : (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => calculateCompanyMatch(opportunity.id)}
-                      className="h-6 px-2 text-xs"
-                    >
-                      Calculate Match
-                    </Button>
-                  )}
-                </div>
-              )}
+                    <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200">
+                      <div className="animate-pulse">Calculating...</div>
+                    </Badge>
+                  )
+                ) : (
+                  <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200">
+                    Select profile to see match
+                  </Badge>
+                )}
+              </div>
             </div>
             
-            <p className="text-gray-600 mb-4 line-clamp-3">{opportunity.synopsis}</p>
+            <p className="text-gray-600 mb-3 line-clamp-2">{opportunity.synopsis}</p>
             
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
               {opportunity.responseDeadLine && (
                 <div className="flex items-center">
                   <Calendar className="h-4 w-4 mr-2 text-gray-400" />
@@ -1136,6 +1285,23 @@ function OpportunityCard({
           </div>
           
           <div className="flex flex-col space-y-2 ml-4">
+            {/* Calculate Match Button */}
+            {companyProfile && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => calculateCompanyMatch(opportunity.id)}
+                disabled={loadingMatches.has(opportunity.id)}
+                title="Recalculate Match"
+              >
+                {loadingMatches.has(opportunity.id) ? (
+                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
+                ) : (
+                  <Target className="h-4 w-4" />
+                )}
+              </Button>
+            )}
+            
             <Button
               variant="ghost"
               size="sm"
@@ -1155,7 +1321,7 @@ function OpportunityCard({
         </div>
         
         {/* Preset Messages */}
-        <div className="border-t pt-4">
+        <div className="border-t pt-3">
           <h4 className="text-sm font-medium mb-2">Quick Analysis</h4>
           <div className="flex flex-wrap gap-2">
             {PRESET_MESSAGES.map((preset) => {

@@ -90,7 +90,7 @@ const initialState: AppState = {
   companyProfile: null,
   isCompanyProfileLoading: false,
   sidebarOpen: true,
-  currentView: 'chat',
+      currentView: 'chat',
   theme: 'light',
   samApiKey: typeof window === 'undefined' ? '' : (process.env.NEXT_PUBLIC_SAM_API_KEY || ''),
   encryptionKey: '',
@@ -799,12 +799,29 @@ export const useAppStore = create<AppStore>()(
           }
           
           const data = await response.json();
-          if (data.success && data.data.profiles) {
-            console.log(`✅ Loaded ${data.data.profiles.length} company profiles from vector store`);
-            return data.data.profiles;
+          if (data.success && Array.isArray(data.data?.profiles)) {
+            const remoteProfiles = data.data.profiles;
+            console.log(`✅ Loaded ${remoteProfiles.length} company profiles from vector store`);
+            
+            // If remote returned empty, attempt fallback to localStorage
+            if (remoteProfiles.length === 0) {
+              try {
+                const profiles = JSON.parse(localStorage.getItem('opensam-company-profiles') || '{}');
+                const localProfiles = Object.values(profiles);
+                if (localProfiles.length > 0) {
+                  console.log('🔄 Using localStorage profiles fallback');
+                  return localProfiles as any[];
+                }
+              } catch (localStorageError) {
+                console.warn('⚠️ LocalStorage profiles not available:', localStorageError);
+              }
+            }
+            
+            return remoteProfiles;
           } else {
-            console.warn('⚠️ No profiles found in vector store');
-            return [];
+            console.warn('⚠️ Invalid vector store response; falling back to localStorage');
+            const profiles = JSON.parse(localStorage.getItem('opensam-company-profiles') || '{}');
+            return Object.values(profiles);
           }
         } catch (error) {
           console.error('❌ Failed to load profiles from vector store:', error);

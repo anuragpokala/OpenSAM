@@ -65,6 +65,7 @@ const nextConfig = {
     NEXT_PUBLIC_ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
     NEXT_PUBLIC_HUGGINGFACE_API_KEY: process.env.HUGGINGFACE_API_KEY,
     NEXT_PUBLIC_SAM_API_KEY: process.env.SAM_API_KEY,
+    SUPA_BASE_API_KEY: process.env.SUPA_BASE_API_KEY,
   },
   async headers() {
     return [

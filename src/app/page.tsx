@@ -73,7 +73,7 @@ const HuggingFaceLogo = ({ className = "" }) => (
 
 // Navigation items
 const navigationItems = [
-  { id: 'chat', label: 'Chat', icon: MessageCircle },
+  // { id: 'chat', label: 'Chat', icon: MessageCircle }, // Hidden for now
   { id: 'search', label: 'Search', icon: Search },
   { id: 'forecast', label: 'Forecast', icon: TrendingUp },
   { id: 'upload', label: 'AI Company Profile', icon: Upload },
@@ -100,7 +100,8 @@ export default function Dashboard() {
     setLLMApiKey,
     validateLLMConfig,
     loadProfile,
-    loadSavedProfiles
+    loadSavedProfiles,
+    setCompanyProfile
   } = useAppStore();
 
   // Initialize app
@@ -132,6 +133,14 @@ export default function Dashboard() {
       try {
         const profiles = await loadSavedProfiles();
         setSavedProfiles(profiles);
+        // Auto-select the first available profile if none is selected
+        if ((!selectedCompanyProfile || !companyProfile) && Array.isArray(profiles) && profiles.length > 0) {
+          setSelectedCompanyProfile(profiles[0]);
+          setCompanyProfile(profiles[0]);
+          try {
+            localStorage.setItem('opensam-selected-company-profile', profiles[0].id);
+          } catch {}
+        }
       } catch (error) {
         console.error('Failed to load saved profiles:', error);
         setSavedProfiles([]);
@@ -139,7 +148,7 @@ export default function Dashboard() {
     };
 
     loadProfiles();
-  }, [loadSavedProfiles]);
+  }, [loadSavedProfiles, selectedCompanyProfile, companyProfile, setCompanyProfile]);
 
   // Load selected company profile from localStorage on mount
   useEffect(() => {
@@ -418,10 +427,10 @@ export default function Dashboard() {
           </div>
         </header>
 
-        {/* Main Content Area */}
-        <main className="p-6">
-          {currentView === 'chat' && <ChatView selectedCompanyProfile={selectedCompanyProfile} setSelectedCompanyProfile={setSelectedCompanyProfile} savedProfiles={savedProfiles} />}
-          {currentView === 'search' && <SearchView />}
+                  {/* Main Content Area */}
+          <main className="p-6">
+            {/* {currentView === 'chat' && <ChatView selectedCompanyProfile={selectedCompanyProfile} setSelectedCompanyProfile={setSelectedCompanyProfile} savedProfiles={savedProfiles} />} */}
+            {currentView === 'search' && <SearchView />}
           {currentView === 'forecast' && <ForecastView />}
           {currentView === 'upload' && <UploadView savedProfiles={savedProfiles} />}
           {currentView === 'vectorstore' && <VectorStoreView />}
@@ -659,25 +668,6 @@ function ChatView({
   setSelectedCompanyProfile: React.Dispatch<React.SetStateAction<CompanyProfile | null>>; 
   savedProfiles: CompanyProfile[];
 }) {
-  const [inputMessage, setInputMessage] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [showCompanySelector, setShowCompanySelector] = useState(false);
-  const [showSessionManager, setShowSessionManager] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  
-  const llmConfig = useLLMConfig();
-  const companyProfile = useCompanyProfile();
-  const currentSession = useCurrentSession();
-  const chatSessions = useChatSessions();
-  const prepopulatedMessage = useAppStore((state) => state.prepopulatedMessage);
-  const setPrepopulatedMessage = useAppStore((state) => state.setPrepopulatedMessage);
-  const { 
-    loadSavedProfiles, 
-    loadProfile, 
-    createChatSession, 
-    addMessageToSession,
-    updateSession 
-  } = useAppStore();
 
   // Auto-scroll to bottom when new messages arrive
   const scrollToBottom = () => {
