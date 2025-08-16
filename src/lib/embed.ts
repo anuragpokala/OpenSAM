@@ -9,9 +9,10 @@ export interface EmbeddingConfig {
   model?: string;
 }
 
+import { chatCache } from './chat-cache';
+
 export class EmbeddingService {
   private config: EmbeddingConfig;
-  private cache = new Map<string, number[]>();
 
   constructor(config: EmbeddingConfig) {
     this.config = config;
@@ -21,11 +22,10 @@ export class EmbeddingService {
    * Get embedding for text using configured provider
    */
   async getEmbedding(text: string): Promise<number[]> {
-    const cacheKey = `${text}:${this.config.provider}:${this.config.model}`;
-    
-    // Check cache first
-    if (this.cache.has(cacheKey)) {
-      return this.cache.get(cacheKey)!;
+    // Check global cache first
+    const cachedEmbedding = chatCache.getEmbedding(text);
+    if (cachedEmbedding) {
+      return cachedEmbedding;
     }
 
     let embedding: number[];
@@ -37,18 +37,8 @@ export class EmbeddingService {
         embedding = await this.getLocalEmbedding(text);
       }
 
-      // Cache the result
-      this.cache.set(cacheKey, embedding);
-      
-      // Clean cache if it gets too large
-      if (this.cache.size > 1000) {
-        const entries = Array.from(this.cache.entries());
-        this.cache.clear();
-        // Keep last 500 entries
-        entries.slice(-500).forEach(([key, value]) => {
-          this.cache.set(key, value);
-        });
-      }
+      // Cache the result in global cache
+      chatCache.setEmbedding(text, embedding);
 
       return embedding;
     } catch (error) {
@@ -135,14 +125,18 @@ export class EmbeddingService {
    * Clear the embedding cache
    */
   clearCache(): void {
-    this.cache.clear();
+    // Clear global embedding cache
+    // Note: This is now handled by the global chatCache
   }
 
   /**
    * Get cache statistics
    */
   getCacheStats(): { size: number; hitRate?: number } {
-    return { size: this.cache.size };
+    const stats = chatCache.getStats();
+    return {
+      size: stats.embeddingEntries,
+    };
   }
 }
 

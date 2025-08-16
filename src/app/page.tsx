@@ -33,7 +33,9 @@ import SearchView from '@/components/SearchView';
 import CacheStatus from '@/components/CacheStatus';
 import { MarkdownRenderer } from '@/components/ui/markdown-renderer';
 import { ChatSessionManager } from '@/components/ChatSessionManager';
+import { TemplateSelector } from '@/components/TemplateSelector';
 import { CompanyProfile } from '@/types';
+import { ProfileTemplate } from '@/lib/profile-templates';
 
 // Add logo SVGs at the top (after imports)
 const OpenAILogo = ({ className = "" }) => (
@@ -884,14 +886,14 @@ function ChatView({
             )}
             
             {selectedCompanyProfile && (
-              <div className="flex items-center space-x-2 bg-blue-500/10 px-3 py-1 rounded-full border border-blue-500/20">
-                <Building className="h-4 w-4 text-white" />
-                <span className="text-sm font-medium text-white">
+              <div className="flex items-center space-x-2 bg-blue-500/10 dark:bg-blue-500/20 px-3 py-1 rounded-full border border-blue-500/20 dark:border-blue-500/30">
+                <Building className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
                   {selectedCompanyProfile.entityName}
                 </span>
                 <button
                   onClick={() => setSelectedCompanyProfile(null)}
-                  className="text-white hover:text-white/80"
+                  className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -1283,6 +1285,7 @@ function UploadView({ savedProfiles }: { savedProfiles: CompanyProfile[] }) {
   });
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [manualCompanyName, setManualCompanyName] = useState('');
+  const [showTemplateSelector, setShowTemplateSelector] = useState(false);
   
   const companyProfile = useCompanyProfile();
   const isCompanyProfileLoading = useIsCompanyProfileLoading();
@@ -1296,6 +1299,34 @@ function UploadView({ savedProfiles }: { savedProfiles: CompanyProfile[] }) {
     loadSavedProfiles,
     loadProfile
   } = useAppStore();
+
+  const handleTemplateSelect = (template: ProfileTemplate) => {
+    // Apply template fields to the form
+    setBusinessTypes(template.fields.businessTypes);
+    setNaicsCodes(template.fields.naicsCodes);
+    setCapabilities(template.fields.capabilities);
+    setCertifications(template.fields.certifications);
+    setDescription(template.fields.description);
+    
+    // Update company profile with template data
+    const updatedProfile: CompanyProfile = {
+      id: companyProfile?.id || generateId(),
+      ueiSAM: ueiSAM || '',
+      entityName: manualCompanyName || companyProfile?.entityName || 'New Company',
+      description: template.fields.description,
+      businessTypes: template.fields.businessTypes,
+      naicsCodes: template.fields.naicsCodes,
+      capabilities: template.fields.capabilities,
+      pastPerformance: pastPerformance,
+      certifications: template.fields.certifications,
+      contactInfo: contactInfo,
+      samEntityData: companyProfile?.samEntityData,
+      createdAt: companyProfile?.createdAt || Date.now(),
+      updatedAt: Date.now()
+    };
+    
+    setCompanyProfile(updatedProfile);
+  };
 
   // Load existing profile on mount
   useEffect(() => {
@@ -1532,6 +1563,13 @@ function UploadView({ savedProfiles }: { savedProfiles: CompanyProfile[] }) {
                     </option>
                   ))}
                 </select>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowTemplateSelector(true)}
+                >
+                  Use Template
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
@@ -2045,6 +2083,14 @@ function UploadView({ savedProfiles }: { savedProfiles: CompanyProfile[] }) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Template Selector Modal */}
+      {showTemplateSelector && (
+        <TemplateSelector
+          onTemplateSelect={handleTemplateSelect}
+          onClose={() => setShowTemplateSelector(false)}
+        />
+      )}
     </div>
   );
 }

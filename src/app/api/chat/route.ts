@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { LLMProvider, LLMMessage, LLMResponse, CompanyProfile } from '@/types';
 import { vectorStoreServerUtils } from '@/lib/vectorStore-server';
 import { chatWithRAG, findMatchingOpportunities, RAGContext } from '@/lib/chat-rag';
+import { chatCache } from '@/lib/chat-cache';
 // Removed: import { rateLimit } from '@/lib/utils';
 
 // Rate limiting configuration
@@ -309,9 +310,28 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ API key provided, proceeding with chat request');
 
+    // Check cache first
+    const companyProfileId = companyProfile?.id || 'no-profile';
+    const cachedResponse = chatCache.getChatResponse(messages, companyProfileId, provider, modelName);
+    
+    if (cachedResponse) {
+      console.log('🚀 Returning cached response');
+      return NextResponse.json({
+        success: true,
+        data: {
+          content: cachedResponse.response,
+          ragContext: cachedResponse.ragContext,
+          cached: true
+        }
+      });
+    }
+
     // Remove mock response, use real AI + RAG logic
     let aiResponse = '';
     let ragContext: RAGContext | null = null;
+    let opportunities: Array<{ opportunity: any; score: number }> = [];
+    let accuracyMetrics: any = null;
+    
     try {
       if (companyProfile) {
         // Use RAG flow
@@ -345,6 +365,8 @@ export async function POST(request: NextRequest) {
         );
         aiResponse = ragResult.response;
         ragContext = ragResult.context;
+        opportunities = ragResult.opportunities || [];
+        const accuracyMetrics = ragResult.accuracyMetrics;
       } else {
         // No company profile, just chat
         if (provider === 'openai') {
@@ -360,6 +382,13 @@ export async function POST(request: NextRequest) {
           throw new Error('Unsupported provider');
         }
       }
+      
+      // Cache the response
+      chatCache.setChatResponse(messages, companyProfileId, provider, modelName, {
+        response: aiResponse,
+        ragContext,
+        opportunities
+      });
     } catch (err) {
       console.error('❌ AI chat error:', err);
       return NextResponse.json({ error: 'AI chat error: ' + (err instanceof Error ? err.message : String(err)) }, { status: 500 });
@@ -369,7 +398,8 @@ export async function POST(request: NextRequest) {
       success: true,
       data: {
         content: aiResponse,
-        ragContext: ragContext
+        ragContext: ragContext,
+        accuracyMetrics: accuracyMetrics
       }
     });
 

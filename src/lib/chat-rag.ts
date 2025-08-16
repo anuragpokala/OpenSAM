@@ -5,6 +5,14 @@
 
 import { vectorStoreServerUtils as vectorStoreUtils } from './vectorStore-server';
 import { getEmbeddingService } from './embed';
+import { chatCache } from './chat-cache';
+import { 
+  rankOpportunitiesByAccuracy, 
+  validateResponseAccuracy, 
+  enhanceContextWithAccuracy,
+  EnhancedOpportunity 
+} from './chat-accuracy';
+import { EnhancedRAG, MultiSourceContext } from './enhanced-rag';
 import { CompanyProfile, SAMOpportunity } from '@/types';
 
 export interface RAGContext {
@@ -140,6 +148,15 @@ export async function findMatchingOpportunities(
   limit: number = 5
 ): Promise<Array<{ opportunity: SAMOpportunity; score: number }>> {
   try {
+    // Check cache first
+    const searchQuery = query || companyProfile.description || companyProfile.entityName || '';
+    const cachedResults = chatCache.getVectorSearch(searchQuery, companyProfile.id, limit);
+    
+    if (cachedResults) {
+      console.log('🎯 Using cached vector search results');
+      return cachedResults.results;
+    }
+
     if (query) {
       // Text-based search
       const embeddingService = getEmbeddingService();
@@ -152,7 +169,7 @@ export async function findMatchingOpportunities(
         { type: 'opportunity' }
       );
 
-      return results.map(result => {
+      const mappedResults = results.map(result => {
         const opportunity = {
           id: result.id,
           noticeId: result.id,
@@ -189,10 +206,18 @@ export async function findMatchingOpportunities(
         }
         return { opportunity, score };
       });
+      
+      // Cache the results
+      chatCache.setVectorSearch(searchQuery, companyProfile.id, limit, {
+        results: mappedResults,
+        queryHash: searchQuery
+      });
+      
+      return mappedResults;
     } else {
       // Profile-based matching
       const matches = await vectorStoreUtils.findMatchingOpportunities(companyProfile, limit);
-      return matches.map(({ opportunity, score }) => {
+      const results = matches.map(({ opportunity, score }) => {
         let cachedScore = getCachedMatchScore(companyProfile.id, opportunity.id);
         if (cachedScore === null) {
           cachedScore = Math.round((score ?? 0) * 100);
@@ -200,6 +225,14 @@ export async function findMatchingOpportunities(
         }
         return { opportunity, score: cachedScore };
       });
+      
+      // Cache the results
+      chatCache.setVectorSearch(searchQuery, companyProfile.id, limit, {
+        results,
+        queryHash: searchQuery
+      });
+      
+      return results;
     }
   } catch (error) {
     console.error('Failed to find matching opportunities:', error);
@@ -218,24 +251,46 @@ export async function chatWithRAG(
   response: string;
   context: RAGContext;
   opportunities: Array<{ opportunity: SAMOpportunity; score: number }>;
+  accuracyMetrics?: {
+    accuracy: number;
+    issues: string[];
+    suggestions: string[];
+  };
+  enhancedContext?: MultiSourceContext;
 }> {
   try {
-    // Find matching opportunities
-    const opportunities = await findMatchingOpportunities(companyProfile, userMessage);
+    // Use Enhanced RAG for multi-source context
+    const enhancedRAG = EnhancedRAG.getInstance();
+    const multiSourceContext = await enhancedRAG.buildMultiSourceContext(userMessage, companyProfile);
     
-    // Build RAG prompt
-    const ragPrompt = buildRAGPrompt(userMessage, companyProfile, opportunities);
+    // Build enhanced prompt with comprehensive context
+    const enhancedPrompt = enhancedRAG.buildEnhancedPrompt(userMessage, multiSourceContext);
     
-    // Get LLM response
-    const response = await llmFunction(ragPrompt.systemPrompt, ragPrompt.userPrompt);
+    // Get LLM response with enhanced context
+    const response = await llmFunction(enhancedPrompt.systemPrompt, enhancedPrompt.userPrompt);
+    
+    // Validate response accuracy
+    const accuracyMetrics = validateResponseAccuracy(response, multiSourceContext.opportunities, userMessage);
+    
+    console.log('🎯 Enhanced RAG response accuracy:', {
+      score: Math.round(accuracyMetrics.accuracy * 100),
+      issues: accuracyMetrics.issues.length,
+      suggestions: accuracyMetrics.suggestions.length,
+      contextSources: Object.keys(multiSourceContext).length
+    });
     
     return {
       response,
-      context: ragPrompt.context,
-      opportunities
+      context: {
+        opportunities: multiSourceContext.opportunities,
+        companyProfile: multiSourceContext.companyProfile
+      },
+      opportunities: multiSourceContext.opportunities,
+      accuracyMetrics,
+      enhancedContext: multiSourceContext
     };
   } catch (error) {
-    console.error('RAG chat error:', error);
+    console.error('Enhanced RAG chat error:', error);
     throw error;
   }
 }
