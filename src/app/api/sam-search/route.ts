@@ -202,7 +202,7 @@ export async function GET(req: NextRequest) {
     const offset = searchParams.get('offset');
     const semantic = searchParams.get('semantic');
     const provider = searchParams.get('provider') || 'openai';
-    const samApiKey = searchParams.get('samApiKey') || searchParams.get('api_key');
+    const samApiKey = searchParams.get('samApiKey') || searchParams.get('api_key') || process.env.SAM_API_KEY;
     const entityName = searchParams.get('entityName');
     const contractVehicle = searchParams.get('contractVehicle');
     const classificationCode = searchParams.get('classificationCode');

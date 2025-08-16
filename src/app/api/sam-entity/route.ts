@@ -190,7 +190,7 @@ export async function GET(req: NextRequest) {
     const zipCode = searchParams.get('zipCode');
     const limit = searchParams.get('limit');
     const offset = searchParams.get('offset');
-    const samApiKey = searchParams.get('samApiKey');
+    const samApiKey = searchParams.get('samApiKey') || process.env.SAM_API_KEY;
     
     // Validate required parameters
     if (!samApiKey) {

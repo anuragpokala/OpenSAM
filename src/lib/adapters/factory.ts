@@ -100,7 +100,7 @@ export function loadEnvironmentConfig(): EnvironmentConfig {
     vectorStore: {
       provider: (process.env.VECTOR_STORE_PROVIDER as 'chroma' | 'pinecone') || (isProduction ? 'pinecone' : 'chroma'),
       url: process.env.VECTOR_STORE_URL,
-      apiKey: process.env.VECTOR_STORE_API_KEY,
+      apiKey: process.env.PINECONE_API_KEY,
       environment: process.env.VECTOR_STORE_ENVIRONMENT,
       projectId: process.env.VECTOR_STORE_PROJECT_ID
     }
