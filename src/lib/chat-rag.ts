@@ -3,7 +3,7 @@
  * Integrates opportunity matching with chat flow
  */
 
-import { vectorStoreUtils } from './vectorStore';
+import { vectorStoreServerUtils as vectorStoreUtils } from './vectorStore-server';
 import { getEmbeddingService } from './embed';
 import { CompanyProfile, SAMOpportunity } from '@/types';
 

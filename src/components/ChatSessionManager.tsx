@@ -215,10 +215,10 @@ export function ChatSessionManager({ isOpen, onClose }: ChatSessionManagerProps)
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 max-h-[80vh] overflow-hidden">
+      <div className="bg-card rounded-lg shadow-xl w-full max-w-md mx-4 max-h-[80vh] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Chat Sessions</h2>
+        <div className="flex items-center justify-between p-4 border-b border-border">
+          <h2 className="text-lg font-semibold text-foreground">Chat Sessions</h2>
           <div className="flex items-center space-x-2">
             <Button
               variant="outline"
@@ -233,7 +233,7 @@ export function ChatSessionManager({ isOpen, onClose }: ChatSessionManagerProps)
               variant="ghost"
               size="sm"
               onClick={onClose}
-              className="text-gray-500 hover:text-gray-700"
+              className="text-muted-foreground hover:text-foreground"
             >
               <X className="h-4 w-4" />
             </Button>
@@ -241,9 +241,9 @@ export function ChatSessionManager({ isOpen, onClose }: ChatSessionManagerProps)
         </div>
 
         {/* Search and Filters */}
-        <div className="p-4 border-b border-gray-200 space-y-3">
+        <div className="p-4 border-b border-border space-y-3">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search sessions..."
               value={searchQuery}
@@ -277,8 +277,8 @@ export function ChatSessionManager({ isOpen, onClose }: ChatSessionManagerProps)
         {/* Sessions List */}
         <div className="flex-1 overflow-y-auto max-h-[60vh]">
           {filteredSessions.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
-              <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+            <div className="p-8 text-center text-muted-foreground">
+              <MessageSquare className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
               <p className="text-sm">
                 {searchQuery ? 'No sessions found' : 'No chat sessions yet'}
               </p>
@@ -301,7 +301,7 @@ export function ChatSessionManager({ isOpen, onClose }: ChatSessionManagerProps)
                   key={session.id}
                   className={cn(
                     "mb-2 cursor-pointer transition-all duration-200 hover:shadow-md",
-                    currentSession?.id === session.id && "ring-2 ring-blue-500 bg-blue-50"
+                    currentSession?.id === session.id && "ring-2 ring-blue-500 bg-blue-500/10"
                   )}
                   onClick={() => handleSwitchSession(session)}
                 >
@@ -335,21 +335,21 @@ export function ChatSessionManager({ isOpen, onClose }: ChatSessionManagerProps)
                         ) : (
                           <div>
                             <div className="flex items-center space-x-2">
-                              <h3 className="text-sm font-medium text-gray-900 truncate">
+                              <h3 className="text-sm font-medium text-foreground truncate">
                                 {session.title}
                               </h3>
                               {session.messages.length > 0 && (
-                                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                                <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">
                                   {session.messages.length} messages
                                 </span>
                               )}
                             </div>
-                            <p className="text-xs text-gray-500 mt-1 truncate">
+                            <p className="text-xs text-muted-foreground mt-1 truncate">
                               {getSessionPreview(session)}
                             </p>
                             <div className="flex items-center space-x-1 mt-2">
-                              <Clock className="h-3 w-3 text-gray-400" />
-                              <span className="text-xs text-gray-500">
+                              <Clock className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-xs text-muted-foreground">
                                 {formatTimestamp(session.updatedAt)}
                               </span>
                             </div>
@@ -365,7 +365,7 @@ export function ChatSessionManager({ isOpen, onClose }: ChatSessionManagerProps)
                               e.stopPropagation();
                               handleEditSession(session);
                             }}
-                            className="h-6 w-6 p-0 text-gray-400 hover:text-gray-600"
+                            className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
                           >
                             <Edit3 className="h-3 w-3" />
                           </Button>
@@ -376,7 +376,7 @@ export function ChatSessionManager({ isOpen, onClose }: ChatSessionManagerProps)
                               e.stopPropagation();
                               handleDeleteSession(session.id);
                             }}
-                            className="h-6 w-6 p-0 text-gray-400 hover:text-red-600"
+                            className="h-6 w-6 p-0 text-muted-foreground hover:text-red-500"
                           >
                             <Trash2 className="h-3 w-3" />
                           </Button>
@@ -392,15 +392,15 @@ export function ChatSessionManager({ isOpen, onClose }: ChatSessionManagerProps)
 
         {/* Footer */}
         {filteredSessions.length > 0 && (
-          <div className="p-4 border-t border-gray-200 bg-gray-50">
-            <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
+          <div className="p-4 border-t border-border bg-muted">
+            <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
               <span>{filteredSessions.length} session{filteredSessions.length !== 1 ? 's' : ''}</span>
               <div className="flex items-center space-x-2">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={handleExportSessions}
-                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                  className="text-blue-500 hover:text-blue-400 hover:bg-blue-500/10"
                   title="Export sessions"
                 >
                   <Download className="h-3 w-3" />
@@ -409,7 +409,7 @@ export function ChatSessionManager({ isOpen, onClose }: ChatSessionManagerProps)
                   variant="ghost"
                   size="sm"
                   onClick={handleImportSessions}
-                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                  className="text-blue-500 hover:text-blue-400 hover:bg-blue-500/10"
                   title="Import sessions"
                 >
                   <Upload className="h-3 w-3" />
@@ -418,7 +418,7 @@ export function ChatSessionManager({ isOpen, onClose }: ChatSessionManagerProps)
                   variant="ghost"
                   size="sm"
                   onClick={handleClearAllSessions}
-                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  className="text-red-500 hover:text-red-400 hover:bg-red-500/10"
                 >
                   Clear All
                 </Button>

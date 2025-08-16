@@ -850,24 +850,24 @@ function ChatView({
   return (
     <div className="max-w-5xl mx-auto chat-container">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4 rounded-t-lg">
+      <div className="bg-card border-b border-border px-6 py-4 rounded-t-lg">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse status-indicator"></div>
-              <h2 className="text-lg font-semibold text-gray-900">OpenSAM AI Assistant</h2>
+              <h2 className="text-lg font-semibold text-foreground">OpenSAM AI Assistant</h2>
             </div>
             
             {/* Session Info */}
             {currentSession && (
               <div className="flex items-center space-x-2">
-                <div className="flex items-center space-x-2 bg-gray-50 px-3 py-1 rounded-full">
-                  <MessageSquare className="h-4 w-4 text-gray-600" />
-                  <span className="text-sm font-medium text-gray-800">
+                <div className="flex items-center space-x-2 bg-muted px-3 py-1 rounded-full">
+                  <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium text-foreground">
                     {currentSession.title}
                   </span>
                   {currentSession.messages.length > 0 && (
-                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                    <span className="text-xs text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">
                       {currentSession.messages.length}
                     </span>
                   )}
@@ -876,7 +876,7 @@ function ChatView({
                   variant="ghost"
                   size="sm"
                   onClick={() => setShowSessionManager(true)}
-                  className="text-gray-500 hover:text-gray-700"
+                  className="text-muted-foreground hover:text-foreground"
                 >
                   <ChevronDown className="h-4 w-4" />
                 </Button>
@@ -884,14 +884,14 @@ function ChatView({
             )}
             
             {selectedCompanyProfile && (
-              <div className="flex items-center space-x-2 bg-blue-50 px-3 py-1 rounded-full">
-                <Building className="h-4 w-4 text-blue-600" />
-                <span className="text-sm font-medium text-blue-800">
+              <div className="flex items-center space-x-2 bg-blue-500/10 px-3 py-1 rounded-full border border-blue-500/20">
+                <Building className="h-4 w-4 text-white" />
+                <span className="text-sm font-medium text-white">
                   {selectedCompanyProfile.entityName}
                 </span>
                 <button
                   onClick={() => setSelectedCompanyProfile(null)}
-                  className="text-blue-600 hover:text-blue-800"
+                  className="text-white hover:text-white/80"
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -925,9 +925,9 @@ function ChatView({
 
       {/* Company Profile Selector */}
       {showCompanySelector && (
-        <div className="bg-gray-50 border-b border-gray-200 px-6 py-4">
+        <div className="bg-muted border-b border-border px-6 py-4">
           <div className="max-w-2xl">
-            <h4 className="font-medium text-gray-900 mb-3">Select Company Profile</h4>
+            <h4 className="font-medium text-foreground mb-3">Select Company Profile</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {savedProfiles.length > 0 ? (
                 savedProfiles.map((profile: CompanyProfile) => (
@@ -935,8 +935,8 @@ function ChatView({
                     key={profile.id}
                                          className={`p-3 border rounded-lg cursor-pointer transition-all duration-200 company-profile-option ${
                        selectedCompanyProfile?.id === profile.id
-                         ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
-                         : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
+                         ? 'border-blue-500 bg-blue-500/10 ring-2 ring-blue-500/20'
+                         : 'border-border bg-card hover:border-border/50 hover:shadow-sm'
                      }`}
                     onClick={() => {
                       setSelectedCompanyProfile(profile);
@@ -945,8 +945,8 @@ function ChatView({
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
-                        <p className="font-medium text-gray-900">{profile.entityName || 'Unnamed Company'}</p>
-                        <p className="text-sm text-gray-600">
+                        <p className="font-medium text-foreground">{profile.entityName || 'Unnamed Company'}</p>
+                        <p className="text-sm text-muted-foreground">
                           {profile.naicsCodes?.length > 0 ? `NAICS: ${profile.naicsCodes.join(', ')}` : 'No NAICS codes'}
                         </p>
                       </div>
@@ -958,8 +958,8 @@ function ChatView({
                 ))
               ) : (
                 <div className="col-span-full text-center py-4">
-                  <Building className="h-8 w-8 mx-auto text-gray-400 mb-2" />
-                  <p className="text-sm text-gray-600">
+                  <Building className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                  <p className="text-sm text-muted-foreground">
                     No saved company profiles found. Create one in the AI Company Profile section.
                   </p>
                 </div>
@@ -970,46 +970,46 @@ function ChatView({
       )}
 
       {/* Messages Container */}
-      <div className="chat-messages bg-gray-50 px-6 py-4">
+      <div className="chat-messages bg-background px-6 py-4">
         <div className="max-w-4xl mx-auto">
           {!currentSession || currentSession.messages.length === 0 ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
-                <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
-                  <Bot className="h-8 w-8 text-gray-400" />
+                <div className="w-16 h-16 bg-card rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+                  <Bot className="h-8 w-8 text-muted-foreground" />
                 </div>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Welcome to OpenSAM AI</h3>
-                <p className="text-gray-600 mb-4 max-w-md">
+                <h3 className="text-lg font-medium text-foreground mb-2">Welcome to OpenSAM AI</h3>
+                <p className="text-muted-foreground mb-4 max-w-md">
                   Ask me about SAM.gov opportunities, market trends, or get personalized recommendations for your company.
                 </p>
                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-lg mx-auto quick-actions-grid">
                    <button
                      onClick={() => setInputMessage("What are the latest cybersecurity contract opportunities?")}
-                     className="p-3 text-left bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors quick-action"
+                     className="p-3 text-left bg-card rounded-lg border border-border hover:border-border/50 transition-colors quick-action"
                    >
-                    <div className="font-medium text-gray-900">🔒 Cybersecurity</div>
-                    <div className="text-sm text-gray-600">Latest contract opportunities</div>
+                    <div className="font-medium text-foreground">🔒 Cybersecurity</div>
+                    <div className="text-sm text-muted-foreground">Latest contract opportunities</div>
                   </button>
                                      <button
                      onClick={() => setInputMessage("Show me small business set-aside opportunities in my area")}
-                     className="p-3 text-left bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors quick-action"
+                     className="p-3 text-left bg-card rounded-lg border border-border hover:border-border/50 transition-colors quick-action"
                    >
-                     <div className="font-medium text-gray-900">🏢 Small Business</div>
-                     <div className="text-sm text-gray-600">Set-aside opportunities</div>
+                     <div className="font-medium text-foreground">🏢 Small Business</div>
+                     <div className="text-sm text-muted-foreground">Set-aside opportunities</div>
                    </button>
                    <button
                      onClick={() => setInputMessage("What are the trending NAICS codes this quarter?")}
-                     className="p-3 text-left bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors quick-action"
+                     className="p-3 text-left bg-card rounded-lg border border-border hover:border-border/50 transition-colors quick-action"
                    >
-                     <div className="font-medium text-gray-900">📊 Market Trends</div>
-                     <div className="text-sm text-gray-600">Trending NAICS codes</div>
+                     <div className="font-medium text-foreground">📊 Market Trends</div>
+                     <div className="text-sm text-muted-foreground">Trending NAICS codes</div>
                    </button>
                    <button
                      onClick={() => setInputMessage("Help me understand the proposal requirements for this opportunity")}
-                     className="p-3 text-left bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors quick-action"
+                     className="p-3 text-left bg-card rounded-lg border border-border hover:border-border/50 transition-colors quick-action"
                    >
-                     <div className="font-medium text-gray-900">📋 Proposal Help</div>
-                     <div className="text-sm text-gray-600">Requirements analysis</div>
+                     <div className="font-medium text-foreground">📋 Proposal Help</div>
+                     <div className="text-sm text-muted-foreground">Requirements analysis</div>
                    </button>
                 </div>
               </div>
@@ -1024,7 +1024,7 @@ function ChatView({
                        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
                          message.role === 'user' 
                            ? 'bg-blue-600 text-white' 
-                           : 'bg-gray-200 text-gray-700'
+                           : 'bg-muted text-muted-foreground'
                        }`}>
                          {message.role === 'user' ? (
                            <span className="text-sm font-medium">U</span>
@@ -1038,7 +1038,7 @@ function ChatView({
                          <div className={`inline-block p-4 rounded-2xl max-w-full message-bubble ${
                            message.role === 'user' 
                              ? 'bg-blue-600 text-white rounded-br-md' 
-                             : 'bg-white text-gray-900 rounded-bl-md shadow-sm border border-gray-100'
+                             : 'bg-card text-foreground rounded-bl-md shadow-sm border border-border'
                          }`}>
                           {message.role === 'user' ? (
                             <p className="text-sm leading-relaxed">{message.content}</p>
@@ -1047,23 +1047,23 @@ function ChatView({
                               <MarkdownRenderer content={message.content} />
                                                              {/* Show RAG context if available */}
                                {(message as any).ragContext && (
-                                 <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200 rag-context">
+                                 <div className="mt-4 p-3 bg-blue-500/10 rounded-lg border border-blue-500/20 rag-context">
                                    <div className="flex items-center space-x-2 mb-2">
                                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                                     <p className="text-xs font-medium text-blue-800">
+                                     <p className="text-xs font-medium text-blue-600 dark:text-blue-400">
                                        Related Opportunities ({(message as any).ragContext.opportunities.length})
                                      </p>
                                    </div>
                                    <div className="space-y-2">
                                      {(message as any).ragContext.opportunities.slice(0, 3).map((item: any, oppIndex: number) => (
-                                       <div key={oppIndex} className="text-xs bg-white p-2 rounded border">
-                                         <p className="font-medium text-gray-900 flex items-center justify-between">
+                                       <div key={oppIndex} className="text-xs bg-card p-2 rounded border border-border">
+                                         <p className="font-medium text-foreground flex items-center justify-between">
                                            {item.opportunity.title}
-                                           <span className="px-2 py-0.5 bg-green-100 text-green-800 rounded-full text-[10px] font-semibold">
+                                           <span className="px-2 py-0.5 bg-green-500/20 text-green-600 dark:text-green-400 rounded-full text-[10px] font-semibold">
                                              {item.score}% match
                                            </span>
                                          </p>
-                                         <p className="text-gray-600">
+                                         <p className="text-muted-foreground">
                                            {item.opportunity.naicsCode}
                                          </p>
                                        </div>
@@ -1078,14 +1078,14 @@ function ChatView({
                                                  {/* Message Actions */}
                          <div className={`flex items-center space-x-2 mt-2 message-actions ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                            {message.timestamp && (
-                             <span className="text-xs text-gray-500 message-timestamp">
+                             <span className="text-xs text-muted-foreground message-timestamp">
                                {formatTimestamp(message.timestamp)}
                              </span>
                            )}
                            {message.role === 'assistant' && (
                              <button
                                onClick={() => copyToClipboard(message.content)}
-                               className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                               className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                                title="Copy message"
                              >
                                Copy
@@ -1103,17 +1103,17 @@ function ChatView({
                 <div className="flex justify-start">
                   <div className="max-w-[80%] lg:max-w-[70%]">
                     <div className="flex items-start space-x-3">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
-                        <Bot className="h-4 w-4 text-gray-700" />
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+                        <Bot className="h-4 w-4 text-muted-foreground" />
                       </div>
-                                             <div className="bg-white p-4 rounded-2xl rounded-bl-md shadow-sm border border-gray-100">
+                                             <div className="bg-card p-4 rounded-2xl rounded-bl-md shadow-sm border border-border">
                          <div className="flex items-center space-x-2">
                            <div className="flex space-x-1 typing-dots">
-                             <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                             <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                             <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                             <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
+                             <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                             <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                            </div>
-                           <span className="text-sm text-gray-600">AI is thinking...</span>
+                           <span className="text-sm text-muted-foreground">AI is thinking...</span>
                          </div>
                        </div>
                     </div>
@@ -1133,14 +1133,14 @@ function ChatView({
       />
 
       {/* Input Area */}
-      <div className="bg-white border-t border-gray-200 px-6 py-4 rounded-b-lg">
+      <div className="bg-card border-t border-border px-6 py-4 rounded-b-lg">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-end space-x-3">
             <div className="flex-1">
                              <div className="relative chat-input">
                  <textarea
                    placeholder="Ask about SAM.gov opportunities, market trends, or get personalized recommendations..."
-                   className="w-full p-4 pr-12 border border-gray-300 rounded-xl resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 chat-textarea"
+                   className="w-full p-4 pr-12 border border-input rounded-xl resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 chat-textarea bg-background text-foreground"
                    rows={1}
                    value={inputMessage}
                    onChange={(e) => setInputMessage(e.target.value)}
@@ -1149,7 +1149,7 @@ function ChatView({
                    style={{ minHeight: '48px', maxHeight: '120px' }}
                  />
                 <div className="absolute bottom-3 right-3 flex items-center space-x-2">
-                  <span className="text-xs text-gray-400">
+                  <span className="text-xs text-muted-foreground">
                     {inputMessage.length}/1000
                   </span>
                 </div>
@@ -1180,10 +1180,10 @@ function ChatView({
           </div>
           
           {!llmConfig.apiKey && (
-            <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="mt-3 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
               <div className="flex items-center space-x-2">
                 <Key className="h-4 w-4 text-yellow-500" />
-                <span className="text-sm text-yellow-700">
+                <span className="text-sm text-yellow-600 dark:text-yellow-400">
                   💡 Set your API key in the sidebar to start chatting with AI
                 </span>
               </div>
@@ -1191,10 +1191,10 @@ function ChatView({
           )}
           
           {!selectedCompanyProfile && (
-            <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="mt-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
               <div className="flex items-center space-x-2">
                 <Building className="h-4 w-4 text-blue-500" />
-                <span className="text-sm text-blue-700">
+                <span className="text-sm text-blue-600 dark:text-blue-400">
                   💡 Select a company profile above to get personalized opportunity recommendations
                 </span>
               </div>
@@ -1282,6 +1282,7 @@ function UploadView({ savedProfiles }: { savedProfiles: CompanyProfile[] }) {
     website: ''
   });
   const [isEnhancing, setIsEnhancing] = useState(false);
+  const [manualCompanyName, setManualCompanyName] = useState('');
   
   const companyProfile = useCompanyProfile();
   const isCompanyProfileLoading = useIsCompanyProfileLoading();
@@ -1299,19 +1300,27 @@ function UploadView({ savedProfiles }: { savedProfiles: CompanyProfile[] }) {
   // Load existing profile on mount
   useEffect(() => {
     if (companyProfile) {
-      setUeiSAM(companyProfile.ueiSAM);
-      setDescription(companyProfile.description);
-      setBusinessTypes(companyProfile.businessTypes);
-      setNaicsCodes(companyProfile.naicsCodes);
-      setCapabilities(companyProfile.capabilities);
-      setPastPerformance(companyProfile.pastPerformance);
-      setCertifications(companyProfile.certifications);
-      setContactInfo(companyProfile.contactInfo);
+      setUeiSAM(companyProfile.ueiSAM || '');
+      setDescription(companyProfile.description || '');
+      setBusinessTypes(companyProfile.businessTypes || []);
+      setNaicsCodes(companyProfile.naicsCodes || []);
+      setCapabilities(companyProfile.capabilities || []);
+      setPastPerformance(companyProfile.pastPerformance || []);
+      setCertifications(companyProfile.certifications || []);
+      setContactInfo(companyProfile.contactInfo || {
+        address: '',
+        city: '',
+        state: '',
+        zipCode: '',
+        phone: '',
+        email: '',
+        website: ''
+      });
     }
   }, [companyProfile]);
 
   const handleFetchSAMData = async () => {
-    if (!ueiSAM.trim()) {
+    if (!ueiSAM?.trim()) {
       alert('Please enter a UEI SAM number');
       return;
     }
@@ -1380,21 +1389,26 @@ function UploadView({ savedProfiles }: { savedProfiles: CompanyProfile[] }) {
   };
 
   const handleSaveProfile = async () => {
-    if (!ueiSAM.trim()) {
-      alert('Please enter a UEI SAM number');
-      return;
-    }
-
+    // Make UEI SAM optional - allow saving without it
+    const ueiSAMValue = ueiSAM?.trim() || 'N/A';
+    
     if (!description.trim()) {
       alert('Please provide a company description');
       return;
     }
 
+    // Get company name from either SAM data or manual input
+    const entityName = companyProfile?.entityName || manualCompanyName || contactInfo.website || 'Your Company';
+
+    // Ensure we have a valid ID
+    const profileId = companyProfile?.id || generateId();
+    console.log('Creating profile with ID:', profileId);
+
     try {
       const profile: CompanyProfile = {
-        id: companyProfile?.id || generateId(),
-        ueiSAM,
-        entityName: companyProfile?.entityName || 'Your Company',
+        id: profileId,
+        ueiSAM: ueiSAMValue,
+        entityName: entityName,
         description,
         businessTypes,
         naicsCodes,
@@ -1407,6 +1421,7 @@ function UploadView({ savedProfiles }: { savedProfiles: CompanyProfile[] }) {
         updatedAt: Date.now()
       };
 
+      console.log('Saving profile:', profile);
       await saveCompanyProfile(profile);
       alert('Company profile saved successfully!');
     } catch (error) {
@@ -1416,11 +1431,11 @@ function UploadView({ savedProfiles }: { savedProfiles: CompanyProfile[] }) {
   };
 
   const handleEnhanceProfile = async () => {
-    const companyName = companyProfile?.entityName || '';
+    const companyName = companyProfile?.entityName || manualCompanyName || contactInfo.website || '';
     const website = contactInfo.website || '';
     
     if (!companyName.trim()) {
-      alert('Please fetch SAM data or enter a company name first');
+      alert('Please enter a company name or website URL first');
       return;
     }
 
@@ -1428,14 +1443,29 @@ function UploadView({ savedProfiles }: { savedProfiles: CompanyProfile[] }) {
     try {
       const enhancedData = await enhanceCompanyProfile(companyName, website);
       
-      // Update the profile with enhanced data
+      // Ensure we have a valid ID
+      const profileId = companyProfile?.id || generateId();
+      console.log('Creating enhanced profile with ID:', profileId);
+      
+      // Create or update the profile with enhanced data
       const updatedProfile: CompanyProfile = {
-        ...companyProfile!,
+        id: profileId,
+        ueiSAM: companyProfile?.ueiSAM || ueiSAM || 'N/A',
+        entityName: companyProfile?.entityName || companyName,
         description: enhancedData.enhancedDescription || description,
+        businessTypes: enhancedData.targetMarkets || businessTypes,
+        naicsCodes: companyProfile?.naicsCodes || naicsCodes,
+        capabilities: enhancedData.keyProducts || capabilities,
+        pastPerformance: companyProfile?.pastPerformance || pastPerformance,
+        certifications: companyProfile?.certifications || certifications,
+        contactInfo: companyProfile?.contactInfo || contactInfo,
         aiEnhanced: enhancedData,
+        samEntityData: companyProfile?.samEntityData,
+        createdAt: companyProfile?.createdAt || Date.now(),
         updatedAt: Date.now()
       };
       
+      console.log('Saving enhanced profile:', updatedProfile);
       await saveCompanyProfile(updatedProfile);
       
       // Update form fields with enhanced data
@@ -1515,6 +1545,7 @@ function UploadView({ savedProfiles }: { savedProfiles: CompanyProfile[] }) {
                     setCapabilities([]);
                     setPastPerformance([]);
                     setCertifications([]);
+                    setManualCompanyName('');
                     setContactInfo({
                       address: '',
                       city: '',
@@ -1538,31 +1569,37 @@ function UploadView({ savedProfiles }: { savedProfiles: CompanyProfile[] }) {
               <h3 className="text-lg font-medium text-foreground">Company Identification</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium text-foreground">UEI SAM Number *</label>
+                  <label className="text-sm font-medium text-foreground">UEI SAM Number (Optional)</label>
                   <div className="flex space-x-2 mt-1">
                     <Input
-                      placeholder="Enter your UEI SAM number"
+                      placeholder="Enter your UEI SAM number (optional)"
                       value={ueiSAM}
                       onChange={(e) => setUeiSAM(e.target.value)}
                     />
                     <Button 
                       onClick={handleFetchSAMData}
-                      disabled={isCompanyProfileLoading || !ueiSAM.trim()}
+                      disabled={isCompanyProfileLoading || !ueiSAM?.trim()}
                       variant="outline"
                     >
                       {isCompanyProfileLoading ? 'Fetching...' : 'Fetch SAM Data'}
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Enter your UEI SAM number to automatically fetch company data from SAM.gov
+                    Enter your UEI SAM number to automatically fetch company data from SAM.gov, or leave blank to create a manual profile
                   </p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-foreground">Company Name</label>
                   <Input
-                    placeholder="Company name"
-                    value={companyProfile?.entityName || ''}
-                    disabled
+                    placeholder="Company name (optional - will be auto-filled from SAM data)"
+                    value={companyProfile?.entityName || manualCompanyName}
+                    onChange={(e) => {
+                      setManualCompanyName(e.target.value);
+                      // Update the company profile with the manually entered name
+                      if (companyProfile) {
+                        updateCompanyProfile({ entityName: e.target.value });
+                      }
+                    }}
                     className="mt-1"
                   />
                 </div>
@@ -1583,9 +1620,15 @@ function UploadView({ savedProfiles }: { savedProfiles: CompanyProfile[] }) {
                       <div>
                         <label className="text-sm font-medium text-foreground">Company Name</label>
                         <Input
-                          placeholder="Company name"
-                          value={companyProfile?.entityName || ''}
-                          disabled
+                          placeholder="Company name (optional - will be auto-filled from SAM data)"
+                          value={companyProfile?.entityName || manualCompanyName}
+                          onChange={(e) => {
+                            setManualCompanyName(e.target.value);
+                            // Update the company profile with the manually entered name
+                            if (companyProfile) {
+                              updateCompanyProfile({ entityName: e.target.value });
+                            }
+                          }}
                           className="mt-1"
                         />
                       </div>
@@ -1603,7 +1646,7 @@ function UploadView({ savedProfiles }: { savedProfiles: CompanyProfile[] }) {
                   <div className="ml-4">
                     <Button
                       onClick={handleEnhanceProfile}
-                      disabled={isEnhancing || !companyProfile?.entityName}
+                      disabled={isEnhancing || (!companyProfile?.entityName && !manualCompanyName && !contactInfo.website)}
                       className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground"
                     >
                       {isEnhancing ? (
@@ -1974,7 +2017,7 @@ function UploadView({ savedProfiles }: { savedProfiles: CompanyProfile[] }) {
               <Button variant="outline" onClick={() => window.location.reload()}>
                 Reset
               </Button>
-              <Button onClick={handleSaveProfile} disabled={!ueiSAM.trim() || !description.trim()}>
+              <Button onClick={handleSaveProfile} disabled={!description.trim()}>
                 Save Company Profile
               </Button>
             </div>
